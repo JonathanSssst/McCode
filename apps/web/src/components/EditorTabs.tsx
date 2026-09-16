@@ -22,7 +22,9 @@ export function EditorTabs() {
               active ? 'bg-vsc-bg text-white' : 'bg-vsc-bg-alt text-vsc-fg-dim hover:text-vsc-fg'
             }`}
           >
-            <span className="max-w-[160px] truncate">{file.name}</span>
+            <span className={`max-w-[160px] truncate ${file.preview ? 'italic' : ''}`}>
+              {file.name}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation()

@@ -276,7 +276,7 @@ export const createFileActions = (set: ImmerSet, get: ImmerGet): FileActions => 
     set((s) => {
       s.pendingReveal = { path, range }
     })
-    await get().openFile(node)
+    await get().openFile(node, { preview: true })
   },
 
   clearPendingReveal: () => {

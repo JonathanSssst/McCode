@@ -10,6 +10,7 @@ export function Panel() {
   const logs = useWorkspace((s) => s.logs)
   const setActive = useWorkspace((s) => s.setActive)
   const togglePanel = useWorkspace((s) => s.togglePanel)
+  const panelHeight = useWorkspace((s) => s.panelHeight)
   const tr = useT()
 
   const rows = Object.entries(diagnostics).flatMap(([path, list]) =>
@@ -23,7 +24,10 @@ export function Panel() {
   )
 
   return (
-    <div className="flex h-48 shrink-0 flex-col border-t border-vsc-border bg-vsc-bg-alt">
+    <div
+      style={{ height: panelHeight }}
+      className="flex shrink-0 flex-col overflow-hidden border-t border-vsc-border bg-vsc-bg-alt"
+    >
       <div className="flex h-[35px] items-center gap-4 border-b border-vsc-border px-4 text-[11px] uppercase tracking-wide">
         <button
           className={`pb-[10px] pt-[10px] ${tab === 'problems' ? 'border-b border-white text-white' : 'text-vsc-fg-dim hover:text-vsc-fg'}`}

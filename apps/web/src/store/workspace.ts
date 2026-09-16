@@ -6,6 +6,8 @@ import { detectPackInfo, versionIdForPackFormat, type PackInfo } from '@/lib/pac
 import { getProvider } from '@/lib/provider'
 import { datapackDirs, datapackFiles } from '@/lib/datapack'
 import { loadSettings, saveSettings, type AppSettings, type EditorSettings } from '@/lib/settings'
+import { clampPanel, clampSidebar, loadLayout, saveLayout } from '@/lib/layout'
+import { pinTab, upsertTab } from '@/lib/tabs'
 import type { TemplateKind } from '@/lib/templates'
 import { findNode, type TreeNode } from '@/lib/tree'
 import { loadCommandTree } from '@/mcdata/commands'
@@ -25,6 +27,7 @@ export interface OpenFile {
   language: string
   savedContent: string
   dirty: boolean
+  preview: boolean
 }
 
 export interface CursorInfo {
@@ -51,6 +54,8 @@ export interface WorkspaceState {
   activePath: string | null
   sidebarVisible: boolean
   panelVisible: boolean
+  sidebarWidth: number
+  panelHeight: number
   paletteVisible: boolean
   settingsVisible: boolean
   settings: AppSettings
@@ -77,7 +82,7 @@ export interface WorkspaceState {
   loadRecentFolders: () => Promise<void>
   refreshTree: (paths?: string[]) => Promise<void>
   toggleDirectory: (path: string) => void
-  openFile: (node: TreeNode) => Promise<void>
+  openFile: (node: TreeNode, options?: { preview?: boolean }) => Promise<void>
   closeFile: (path: string) => void
   setActive: (path: string) => void
   setDirty: (path: string, dirty: boolean) => void
@@ -93,6 +98,9 @@ export interface WorkspaceState {
   confirmNewPack: () => Promise<void>
   toggleSidebar: () => void
   togglePanel: () => void
+  setSidebarWidth: (width: number) => void
+  setPanelHeight: (height: number) => void
+  persistLayout: () => void
   setActiveView: (view: 'explorer' | 'data' | 'search' | 'outline') => void
   loadRegistries: (version: string) => Promise<void>
   setGameVersion: (version: string) => Promise<void>
@@ -144,6 +152,7 @@ export const useWorkspace = create<WorkspaceState>()(
     activePath: null,
     sidebarVisible: true,
     panelVisible: false,
+    ...loadLayout(),
     paletteVisible: false,
     settingsVisible: false,
     settings: loadSettings(),
@@ -272,7 +281,7 @@ export const useWorkspace = create<WorkspaceState>()(
       })
     },
 
-    openFile: async (node) => {
+    openFile: async (node, options) => {
       if (node.kind !== 'file') return
       if (isBinaryPath(node.path)) {
         set((s) => {
@@ -280,10 +289,12 @@ export const useWorkspace = create<WorkspaceState>()(
         })
         return
       }
+      const preview = options?.preview ?? false
       const existing = get().openFiles.find((f) => f.path === node.path)
       if (existing) {
         set((s) => {
           s.activePath = node.path
+          if (!preview) pinTab(s.openFiles, node.path)
         })
         return
       }
@@ -294,11 +305,22 @@ export const useWorkspace = create<WorkspaceState>()(
         language: languageForPath(node.path),
         savedContent: content,
         dirty: false,
+        preview,
       }
+      const replaced: { path: string | null } = { path: null }
       set((s) => {
-        s.openFiles.push(file)
+        const target = upsertTab(s.openFiles, node.path, preview, () => file)
+        if (target) {
+          replaced.path = target.path
+          delete s.diagnostics[target.path]
+        }
         s.activePath = node.path
       })
+      if (replaced.path) {
+        const replacedPath = replaced.path
+        void loadSpyglass().then((m) => m.closeDocument(replacedPath))
+        disposeModel(replacedPath)
+      }
       await (await loadSpyglass()).openDocument(file.path, file.language, content)
     },
 
@@ -334,7 +356,10 @@ export const useWorkspace = create<WorkspaceState>()(
     setDirty: (path, dirty) => {
       set((s) => {
         const file = s.openFiles.find((f) => f.path === path)
-        if (file) file.dirty = dirty
+        if (file) {
+          file.dirty = dirty
+          if (dirty) file.preview = false
+        }
       })
     },
 
@@ -415,6 +440,22 @@ export const useWorkspace = create<WorkspaceState>()(
       set((s) => {
         s.panelVisible = !s.panelVisible
       })
+    },
+
+    setSidebarWidth: (width) => {
+      set((s) => {
+        s.sidebarWidth = clampSidebar(width)
+      })
+    },
+
+    setPanelHeight: (height) => {
+      set((s) => {
+        s.panelHeight = clampPanel(height, typeof window === 'undefined' ? 800 : window.innerHeight)
+      })
+    },
+
+    persistLayout: () => {
+      saveLayout({ sidebarWidth: get().sidebarWidth, panelHeight: get().panelHeight })
     },
 
     setActiveView: (view) => {

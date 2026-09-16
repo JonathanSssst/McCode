@@ -22,6 +22,7 @@ function Row({
   isDir,
   open,
   onClick,
+  onDoubleClick,
   onContextMenu,
 }: {
   depth: number
@@ -31,11 +32,13 @@ function Row({
   isDir: boolean
   open: boolean
   onClick: () => void
+  onDoubleClick?: () => void
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
 }) {
   return (
     <div
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       title={label}
       className={`flex h-[22px] cursor-pointer select-none items-center gap-1 whitespace-nowrap pr-2 text-[13px] ${
@@ -75,7 +78,11 @@ function NodeView({ node, depth }: { node: TreeNode; depth: number }) {
   const isDir = node.kind === 'directory'
   const onClick = () => {
     if (isDir) toggleDirectory(node.path)
-    else void openFile(node)
+    else void openFile(node, { preview: true })
+  }
+
+  const onDoubleClick = () => {
+    if (!isDir) void openFile(node, { preview: false })
   }
 
   const onContextMenu = (event: MouseEvent<HTMLDivElement>) => {
@@ -107,6 +114,7 @@ function NodeView({ node, depth }: { node: TreeNode; depth: number }) {
         isDir={isDir}
         open={expanded}
         onClick={onClick}
+        onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
       />
       {isDir &&

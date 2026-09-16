@@ -13,8 +13,10 @@ import { OutlineView } from '@/components/OutlineView'
 import { Panel } from '@/components/Panel'
 import { SearchView } from '@/components/SearchView'
 import { SettingsDialog } from '@/components/SettingsDialog'
+import { Splitter } from '@/components/Splitter'
 import { StatusBar } from '@/components/StatusBar'
 import { WindowControls } from '@/components/WindowControls'
+import { DEFAULT_LAYOUT } from '@/lib/layout'
 import { useWorkspace } from '@/store/workspace'
 
 function MenuBar() {
@@ -54,7 +56,7 @@ function MenuBar() {
   }
 
   return (
-    <div className="relative flex h-[30px] select-none items-center gap-1 bg-[#323233] px-2 text-[12px] text-vsc-fg [-webkit-app-region:drag]">
+    <div className="relative flex h-[30px] select-none items-center gap-1 bg-[#323233] pl-2 text-[12px] text-vsc-fg [-webkit-app-region:drag]">
       <span className="mr-2 font-semibold text-white">MCCode</span>
       {Object.keys(menus).map((name) => (
         <div key={name} className="relative [-webkit-app-region:no-drag]">
@@ -94,6 +96,11 @@ function MenuBar() {
 export default function App() {
   const sidebarVisible = useWorkspace((s) => s.sidebarVisible)
   const panelVisible = useWorkspace((s) => s.panelVisible)
+  const sidebarWidth = useWorkspace((s) => s.sidebarWidth)
+  const panelHeight = useWorkspace((s) => s.panelHeight)
+  const setSidebarWidth = useWorkspace((s) => s.setSidebarWidth)
+  const setPanelHeight = useWorkspace((s) => s.setPanelHeight)
+  const persistLayout = useWorkspace((s) => s.persistLayout)
   const activeView = useWorkspace((s) => s.activeView)
   const anyDirty = useWorkspace((s) => s.openFiles.some((file) => file.dirty))
   const language = useWorkspace((s) => s.settings.language)
@@ -157,22 +164,51 @@ export default function App() {
       <div className="flex min-h-0 flex-1">
         <ActivityBar />
         {sidebarVisible && (
-          <div className="flex w-60 shrink-0 flex-col border-r border-vsc-border bg-vsc-bg-alt">
-            {activeView === 'data' ? (
-              <DataBrowser />
-            ) : activeView === 'search' ? (
-              <SearchView />
-            ) : activeView === 'outline' ? (
-              <OutlineView />
-            ) : (
-              <FileExplorer />
-            )}
-          </div>
+          <>
+            <div
+              style={{ width: sidebarWidth }}
+              className="flex shrink-0 flex-col overflow-hidden border-r border-vsc-border bg-vsc-bg-alt"
+            >
+              {activeView === 'data' ? (
+                <DataBrowser />
+              ) : activeView === 'search' ? (
+                <SearchView />
+              ) : activeView === 'outline' ? (
+                <OutlineView />
+              ) : (
+                <FileExplorer />
+              )}
+            </div>
+            <Splitter
+              orientation="vertical"
+              label="Resize Sidebar"
+              onResize={(delta) => setSidebarWidth(sidebarWidth + delta)}
+              onResizeEnd={persistLayout}
+              onReset={() => {
+                setSidebarWidth(DEFAULT_LAYOUT.sidebarWidth)
+                persistLayout()
+              }}
+            />
+          </>
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <EditorTabs />
           <EditorPane />
-          {panelVisible && <Panel />}
+          {panelVisible && (
+            <>
+              <Splitter
+                orientation="horizontal"
+                label="Resize Panel"
+                onResize={(delta) => setPanelHeight(panelHeight - delta)}
+                onResizeEnd={persistLayout}
+                onReset={() => {
+                  setPanelHeight(DEFAULT_LAYOUT.panelHeight)
+                  persistLayout()
+                }}
+              />
+              <Panel />
+            </>
+          )}
         </div>
       </div>
       <StatusBar />
