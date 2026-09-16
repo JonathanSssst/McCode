@@ -6,6 +6,9 @@ release/
 .DS_Store
 .vite/
 *.log
+.env
+.env.*
+!.env.example
 test-results/
 playwright-report/
 blob-report/

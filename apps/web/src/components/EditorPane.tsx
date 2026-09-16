@@ -3,6 +3,7 @@ import { useT } from '@/i18n'
 import { languageForPath } from '@/lib/languages'
 import { getOrCreateModel } from '@/monaco/models'
 import { setActiveEditor } from '@/monaco/activeEditor'
+import { registerAiCompletion } from '@/monaco/aiCompletion'
 import { monaco } from '@/monaco/setup'
 import { useWorkspace } from '@/store/workspace'
 
@@ -36,6 +37,7 @@ export function EditorPane() {
     })
     editorRef.current = editor
     setActiveEditor(editor)
+    registerAiCompletion()
 
     editor.onDidChangeCursorPosition((e) => {
       const selection = editor.getSelection()

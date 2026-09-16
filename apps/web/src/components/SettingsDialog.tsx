@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useT } from '@/i18n'
+import { DEFAULT_MODEL, isConfigured } from '@/lib/ai/config'
 import type { AppSettings } from '@/lib/settings'
 import { useWorkspace } from '@/store/workspace'
 
@@ -63,6 +64,7 @@ export function SettingsDialog() {
 
   if (!visible) return null
   const editor = settings.editor
+  const aiConfigured = isConfigured()
 
   return (
     <div className="fixed inset-0 z-[70] flex justify-center bg-black/40 pt-[7vh]" onClick={close}>
@@ -264,6 +266,80 @@ export function SettingsDialog() {
                 ))}
               </select>
             </Row>
+          </Section>
+
+          <Section title={tr('settings.ai')}>
+            <Row label={tr('settings.aiEnabled')} hint={tr('settings.aiEnabledHint')}>
+              <input
+                type="checkbox"
+                checked={settings.ai.enabled}
+                onChange={(e) => update({ ai: { enabled: e.target.checked } })}
+              />
+            </Row>
+            <Row label={tr('settings.aiKey')}>
+              <span
+                className={`max-w-[320px] text-right text-[12px] ${
+                  aiConfigured ? 'text-[#4ec9b0]' : 'text-[#f48771]'
+                }`}
+              >
+                {aiConfigured
+                  ? tr('settings.aiKeySet', {
+                      model: import.meta.env.VITE_DEEPSEEK_MODEL || DEFAULT_MODEL,
+                    })
+                  : tr('settings.aiKeyMissing')}
+              </span>
+            </Row>
+            <Row label={tr('settings.aiMaxTokens')}>
+              <input
+                type="number"
+                min={16}
+                max={1024}
+                step={16}
+                value={settings.ai.maxTokens}
+                onChange={(e) => update({ ai: { maxTokens: Number(e.target.value) } })}
+                className={`${inputClass} w-20`}
+              />
+            </Row>
+            <Row label={tr('settings.aiDebounce')}>
+              <input
+                type="number"
+                min={0}
+                max={3000}
+                step={50}
+                value={settings.ai.debounceMs}
+                onChange={(e) => update({ ai: { debounceMs: Number(e.target.value) } })}
+                className={`${inputClass} w-20`}
+              />
+            </Row>
+            <Row label={tr('settings.aiTemperature')}>
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                value={settings.ai.temperature}
+                onChange={(e) => update({ ai: { temperature: Number(e.target.value) } })}
+                className={`${inputClass} w-20`}
+              />
+            </Row>
+            <Row label={tr('settings.aiProjectContext')} hint={tr('settings.aiProjectContextHint')}>
+              <input
+                type="checkbox"
+                checked={settings.ai.includeProjectContext}
+                onChange={(e) => update({ ai: { includeProjectContext: e.target.checked } })}
+              />
+            </Row>
+            <Row label={tr('settings.aiMaxContextFiles')}>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={settings.ai.maxContextFiles}
+                onChange={(e) => update({ ai: { maxContextFiles: Number(e.target.value) } })}
+                className={`${inputClass} w-20`}
+              />
+            </Row>
+            <div className="text-[11px] text-vsc-fg-dim">{tr('settings.aiPrivacy')}</div>
           </Section>
         </div>
       </div>

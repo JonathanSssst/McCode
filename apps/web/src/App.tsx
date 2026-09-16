@@ -13,6 +13,7 @@ import { OutlineView } from '@/components/OutlineView'
 import { Panel } from '@/components/Panel'
 import { SearchView } from '@/components/SearchView'
 import { SettingsDialog } from '@/components/SettingsDialog'
+import { SourceControlView } from '@/components/SourceControlView'
 import { Splitter } from '@/components/Splitter'
 import { StatusBar } from '@/components/StatusBar'
 import { WindowControls } from '@/components/WindowControls'
@@ -111,6 +112,7 @@ export default function App() {
 
   useEffect(() => {
     void useWorkspace.getState().loadRecentFolders()
+    void useWorkspace.getState().checkGitAvailability()
   }, [])
 
   useEffect(() => {
@@ -143,6 +145,9 @@ export default function App() {
       } else if (key === 'b') {
         e.preventDefault()
         useWorkspace.getState().toggleSidebar()
+      } else if (e.shiftKey && key === 'g') {
+        e.preventDefault()
+        useWorkspace.getState().setActiveView('scm')
       } else if (key === 'j') {
         e.preventDefault()
         useWorkspace.getState().togglePanel()
@@ -175,6 +180,8 @@ export default function App() {
                 <SearchView />
               ) : activeView === 'outline' ? (
                 <OutlineView />
+              ) : activeView === 'scm' ? (
+                <SourceControlView />
               ) : (
                 <FileExplorer />
               )}

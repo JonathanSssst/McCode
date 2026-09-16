@@ -11,6 +11,8 @@ interface MccodeDesktopBridge {
   copy(sourcePath: string, targetPath: string): Promise<void>
   stat(path: string): Promise<{ isDirectory: boolean; isFile: boolean }>
   reveal(path: string): Promise<void>
+  gitCheck(): Promise<{ available: boolean; version: string }>
+  gitRun(args: string[]): Promise<{ code: number; stdout: string; stderr: string }>
   setDirty(dirty: boolean): void
   windowMinimize(): void
   windowToggleMaximize(): void

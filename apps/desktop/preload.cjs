@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('mccodeDesktop', {
   copy: (sourcePath, targetPath) => ipcRenderer.invoke('mccode:copy', sourcePath, targetPath),
   stat: (target) => ipcRenderer.invoke('mccode:stat', target),
   reveal: (target) => ipcRenderer.invoke('mccode:reveal', target),
+  gitCheck: () => ipcRenderer.invoke('mccode:git-check'),
+  gitRun: (args) => ipcRenderer.invoke('mccode:git-run', args),
   setDirty: (dirty) => ipcRenderer.send('mccode:set-dirty', Boolean(dirty)),
   windowMinimize: () => ipcRenderer.send('mccode:window-minimize'),
   windowToggleMaximize: () => ipcRenderer.send('mccode:window-toggle-maximize'),

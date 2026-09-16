@@ -6,6 +6,7 @@ import { detectPackInfo, versionIdForPackFormat, type PackInfo } from '@/lib/pac
 import { getProvider } from '@/lib/provider'
 import { datapackDirs, datapackFiles } from '@/lib/datapack'
 import { loadSettings, saveSettings, type AppSettings, type EditorSettings } from '@/lib/settings'
+import type { AiSettings, AiStatus } from '@/lib/ai/types'
 import { clampPanel, clampSidebar, loadLayout, saveLayout } from '@/lib/layout'
 import { pinTab, upsertTab } from '@/lib/tabs'
 import type { TemplateKind } from '@/lib/templates'
@@ -17,6 +18,7 @@ import { disposeAllModels, disposeModel, getModel } from '@/monaco/models'
 import { applyTextEdits } from '@/lib/textEdits'
 import type { SpyDiagnostic, SpyRange, SpyTextEdit } from '@/spyglass/client'
 import { createFileActions } from './fileActions'
+import { createGitActions, initialGitState, type GitActions, type GitState } from './gitSlice'
 import { handleDiagnostics, loadSpyglass, startWatching, stopWatching } from './helpers'
 
 let providersRegistered = false
@@ -45,7 +47,7 @@ export interface ContextMenuItem {
 
 const emptyPack: PackInfo = { packFormat: null, supportedFormats: null, description: null }
 
-export interface WorkspaceState {
+export interface WorkspaceState extends GitState, GitActions {
   rootName: string | null
   pack: PackInfo
   tree: TreeNode[]
@@ -59,7 +61,7 @@ export interface WorkspaceState {
   paletteVisible: boolean
   settingsVisible: boolean
   settings: AppSettings
-  activeView: 'explorer' | 'data' | 'search' | 'outline'
+  activeView: 'explorer' | 'data' | 'search' | 'outline' | 'scm'
   registries: Record<string, string[]>
   gameVersion: string
   resolvedVersion: string | null
@@ -75,6 +77,8 @@ export interface WorkspaceState {
   contextMenu: { x: number; y: number; items: ContextMenuItem[] } | null
   pendingReveal: { path: string; range: SpyRange } | null
   statusMessage: string
+  aiStatus: AiStatus
+  aiMessage: string
   cursor: CursorInfo
 
   openFolder: (path?: string) => Promise<void>
@@ -101,7 +105,7 @@ export interface WorkspaceState {
   setSidebarWidth: (width: number) => void
   setPanelHeight: (height: number) => void
   persistLayout: () => void
-  setActiveView: (view: 'explorer' | 'data' | 'search' | 'outline') => void
+  setActiveView: (view: 'explorer' | 'data' | 'search' | 'outline' | 'scm') => void
   loadRegistries: (version: string) => Promise<void>
   setGameVersion: (version: string) => Promise<void>
   setPaletteVisible: (value: boolean) => void
@@ -109,12 +113,14 @@ export interface WorkspaceState {
   closeSettings: () => void
   updateSettings: (patch: {
     editor?: Partial<EditorSettings>
+    ai?: Partial<AiSettings>
     confirmDelete?: boolean
     autoSave?: AppSettings['autoSave']
     language?: AppSettings['language']
   }) => void
   importSettings: (settings: AppSettings) => void
   setStatusMessage: (message: string) => void
+  setAiStatus: (status: AiStatus, message?: string) => void
   setCursor: (cursor: CursorInfo) => void
   setDiagnostics: (path: string, diagnostics: SpyDiagnostic[]) => void
   appendLog: (level: string, message: string) => void
@@ -172,9 +178,13 @@ export const useWorkspace = create<WorkspaceState>()(
     contextMenu: null,
     pendingReveal: null,
     statusMessage: 'Ready',
+    ...initialGitState,
+    aiStatus: 'idle',
+    aiMessage: '',
     cursor: { line: 1, column: 1, selectionLength: 0 },
 
     ...createFileActions(set, get),
+    ...createGitActions(set, get),
 
     openFolder: async (path) => {
       const provider = getProvider()
@@ -204,6 +214,7 @@ export const useWorkspace = create<WorkspaceState>()(
         s.diagnostics = {}
         s.statusMessage = t('status.opened', { name: rootName })
       })
+      void get().refreshGit()
       const spy = await loadSpyglass()
       await spy.initSpyglass({
         gameVersion: get().gameVersion,
@@ -235,6 +246,7 @@ export const useWorkspace = create<WorkspaceState>()(
         void get().refreshTree(paths)
       })
       void get().loadRecentFolders()
+      void get().refreshGit()
     },
 
     closeFolder: () => {
@@ -273,6 +285,7 @@ export const useWorkspace = create<WorkspaceState>()(
         s.statusMessage = t('status.refreshed')
       })
       void loadSpyglass().then((m) => m.refreshProject(paths))
+      void get().refreshGit()
     },
 
     toggleDirectory: (path) => {
@@ -540,6 +553,7 @@ export const useWorkspace = create<WorkspaceState>()(
     updateSettings: (patch) => {
       set((s) => {
         if (patch.editor) s.settings.editor = { ...s.settings.editor, ...patch.editor }
+        if (patch.ai) s.settings.ai = { ...s.settings.ai, ...patch.ai }
         if (patch.confirmDelete !== undefined) s.settings.confirmDelete = patch.confirmDelete
         if (patch.autoSave !== undefined) s.settings.autoSave = patch.autoSave
         if (patch.language !== undefined) s.settings.language = patch.language
@@ -557,6 +571,13 @@ export const useWorkspace = create<WorkspaceState>()(
     setStatusMessage: (message) => {
       set((s) => {
         s.statusMessage = message
+      })
+    },
+
+    setAiStatus: (status, message = '') => {
+      set((s) => {
+        s.aiStatus = status
+        s.aiMessage = message
       })
     },
 

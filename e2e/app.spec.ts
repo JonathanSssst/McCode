@@ -29,6 +29,8 @@ test('settings dialog opens with Ctrl+,', async ({ page }) => {
   await page.keyboard.press('Control+,')
   await expect(page.getByText('Settings').first()).toBeVisible()
   await expect(page.getByText('Font Size')).toBeVisible()
+  await expect(page.getByText('AI Completion').first()).toBeVisible()
+  await expect(page.getByText('Max Output Tokens')).toBeVisible()
 })
 
 test('switching language updates the UI live', async ({ page }) => {

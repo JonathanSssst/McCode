@@ -8,16 +8,19 @@ import {
   IconProblems,
   IconSearch,
   IconSettings,
+  IconSourceControl,
 } from './icons'
 
 function ActivityButton({
   active,
   title,
+  badge,
   onClick,
   children,
 }: {
   active?: boolean
   title: string
+  badge?: number
   onClick: () => void
   children: ReactNode
 }) {
@@ -31,6 +34,11 @@ function ActivityButton({
     >
       {active && <span className="absolute left-0 top-0 h-full w-0.5 bg-white" />}
       {children}
+      {badge !== undefined && badge > 0 && (
+        <span className="absolute bottom-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-vsc-accent px-1 text-[9px] text-white">
+          {badge}
+        </span>
+      )}
     </button>
   )
 }
@@ -41,9 +49,10 @@ export function ActivityBar() {
   const toggleSidebar = useWorkspace((s) => s.toggleSidebar)
   const setActiveView = useWorkspace((s) => s.setActiveView)
   const openFolder = useWorkspace((s) => s.openFolder)
+  const changeCount = useWorkspace((s) => (s.gitRepo ? s.gitFiles.length : 0))
   const tr = useT()
 
-  const clickView = (view: 'explorer' | 'data' | 'search' | 'outline') => {
+  const clickView = (view: 'explorer' | 'data' | 'search' | 'outline' | 'scm') => {
     if (activeView === view && sidebarVisible) toggleSidebar()
     else setActiveView(view)
   }
@@ -77,6 +86,14 @@ export function ActivityBar() {
         onClick={() => clickView('search')}
       >
         <IconSearch />
+      </ActivityButton>
+      <ActivityButton
+        title={tr('activity.scm')}
+        active={activeView === 'scm' && sidebarVisible}
+        badge={changeCount}
+        onClick={() => clickView('scm')}
+      >
+        <IconSourceControl />
       </ActivityButton>
       <ActivityButton
         title={tr('activity.problems')}

@@ -1,3 +1,5 @@
+import { DEFAULT_AI_SETTINGS, type AiSettings } from './ai/types'
+
 export interface EditorSettings {
   theme: 'dark' | 'light'
   fontSize: number
@@ -14,6 +16,7 @@ export interface EditorSettings {
 
 export interface AppSettings {
   editor: EditorSettings
+  ai: AiSettings
   confirmDelete: boolean
   autoSave: 'off' | 'afterDelay'
   language: 'zh' | 'en'
@@ -36,6 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   confirmDelete: true,
   autoSave: 'off',
   language: 'zh',
+  ai: { ...DEFAULT_AI_SETTINGS },
 }
 
 const STORAGE_KEY = 'mccode:settings'
@@ -53,6 +57,7 @@ export function loadSettings(): AppSettings {
       ...DEFAULT_SETTINGS,
       ...parsed,
       editor: { ...DEFAULT_SETTINGS.editor, ...(parsed.editor ?? {}) },
+      ai: { ...DEFAULT_SETTINGS.ai, ...(parsed.ai ?? {}) },
     }
   } catch {
     return cloneDefaults()

@@ -1,4 +1,5 @@
 import { useT } from '@/i18n'
+import { isConfigured } from '@/lib/ai/config'
 import { fileName } from '@/lib/languages'
 import { versionLabelForPackFormat } from '@/lib/pack'
 import { useWorkspace } from '@/store/workspace'
@@ -13,6 +14,40 @@ export function StatusBar() {
   const activePath = useWorkspace((s) => s.activePath)
   const diagnostics = useWorkspace((s) => s.diagnostics)
   const togglePanel = useWorkspace((s) => s.togglePanel)
+  const aiStatus = useWorkspace((s) => s.aiStatus)
+  const aiMessage = useWorkspace((s) => s.aiMessage)
+  const aiEnabled = useWorkspace((s) => s.settings.ai.enabled)
+  const openSettings = useWorkspace((s) => s.openSettings)
+  const aiConfigured = isConfigured()
+  const gitRepo = useWorkspace((s) => s.gitRepo)
+  const gitBranch = useWorkspace((s) => s.gitBranch)
+  const gitDetached = useWorkspace((s) => s.gitDetached)
+  const gitAhead = useWorkspace((s) => s.gitAhead)
+  const gitBehind = useWorkspace((s) => s.gitBehind)
+  const setActiveView = useWorkspace((s) => s.setActiveView)
+
+  const gitTitle = gitDetached
+    ? tr('status.detachedTitle')
+    : tr('status.branchTitle', { name: gitBranch ?? '' }) +
+      (gitAhead > 0 || gitBehind > 0
+        ? ` · ${tr('status.aheadBehind', { ahead: gitAhead, behind: gitBehind })}`
+        : '')
+
+  const aiTitle = !aiConfigured
+    ? tr('status.aiNoKey')
+    : !aiEnabled
+      ? tr('status.aiOff')
+      : aiStatus === 'loading'
+        ? tr('status.aiLoading')
+        : aiStatus === 'error'
+          ? tr('status.aiError', { message: aiMessage })
+          : tr('status.aiIdle')
+  const aiColor =
+    aiStatus === 'error'
+      ? 'text-[#ffd0c7]'
+      : aiStatus === 'loading'
+        ? 'text-[#bcd8ff]'
+        : 'opacity-90'
 
   const versionLabel = versionLabelForPackFormat(pack.packFormat)
   let errors = 0
@@ -50,6 +85,28 @@ export function StatusBar() {
         </span>
       )}
       <span className="opacity-90">{activePath ? fileName(activePath) : ''}</span>
+      {gitRepo && (
+        <button
+          onClick={() => setActiveView('scm')}
+          title={gitTitle}
+          className="flex items-center gap-1 hover:bg-white/15"
+        >
+          <span>⑂ {gitDetached ? tr('status.detachedTitle') : gitBranch}</span>
+          {(gitAhead > 0 || gitBehind > 0) && (
+            <span className="opacity-80">
+              {gitAhead > 0 ? `↑${gitAhead}` : ''}
+              {gitBehind > 0 ? `↓${gitBehind}` : ''}
+            </span>
+          )}
+        </button>
+      )}
+      <button
+        onClick={openSettings}
+        title={aiTitle}
+        className="flex items-center gap-1 hover:bg-white/15"
+      >
+        <span className={aiColor}>✦ AI</span>
+      </button>
       <button onClick={togglePanel} className="flex items-center gap-2 hover:bg-white/15">
         <span>⊗ {errors}</span>
         <span>⚠ {warnings}</span>

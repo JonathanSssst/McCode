@@ -3,6 +3,7 @@ const http = require('node:http')
 const fs = require('node:fs')
 const fsp = require('node:fs/promises')
 const path = require('node:path')
+const { execFile } = require('node:child_process')
 
 const DIST = app.isPackaged
   ? path.join(process.resourcesPath, 'web', 'dist')
@@ -63,6 +64,11 @@ let serverPort = null
 let hasUnsaved = false
 let watcher = null
 let watchTimer = null
+let currentRoot = null
+
+function isInsideGitDir(target) {
+  return target.split(/[\\/]/).includes('.git')
+}
 
 function startWatching(dir, webContents) {
   if (watcher) {
@@ -76,7 +82,9 @@ function startWatching(dir, webContents) {
   if (!dir) return
   let pending = new Set()
   const notify = (_eventType, filename) => {
-    if (filename) pending.add(path.join(dir, filename))
+    if (!filename) return
+    if (isInsideGitDir(filename)) return
+    pending.add(path.join(dir, filename))
     if (watchTimer) clearTimeout(watchTimer)
     watchTimer = setTimeout(() => {
       watchTimer = null
@@ -126,6 +134,42 @@ function addRecent(dir) {
   writeStore('recent.json', recent)
 }
 
+const { validateGitArgs } = require('./gitSafety.cjs')
+
+function runGit(args, cwd) {
+  return new Promise((resolve) => {
+    execFile(
+      'git',
+      ['-c', 'core.quotepath=false', ...args],
+      {
+        cwd,
+        shell: false,
+        windowsHide: true,
+        timeout: 20000,
+        maxBuffer: 2 * 1024 * 1024,
+        env: {
+          ...process.env,
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_OPTIONAL_LOCKS: '0',
+          GIT_PAGER: 'cat',
+          LC_ALL: 'C',
+        },
+      },
+      (error, stdout, stderr) => {
+        if (error && error.code === 'ENOENT') {
+          resolve({ code: -1, stdout: '', stderr: 'git executable not found' })
+          return
+        }
+        resolve({
+          code: typeof error?.code === 'number' ? error.code : error ? 1 : 0,
+          stdout: stdout ?? '',
+          stderr: stderr ?? (error ? String(error.message) : ''),
+        })
+      },
+    )
+  })
+}
+
 function registerIpc() {
   ipcMain.handle('mccode:openFolder', async (event) => {
     const result = await dialog.showOpenDialog({
@@ -133,6 +177,7 @@ function registerIpc() {
     })
     if (result.canceled || result.filePaths.length === 0) return null
     addRecent(result.filePaths[0])
+    currentRoot = result.filePaths[0]
     startWatching(result.filePaths[0], event.sender)
     return { path: result.filePaths[0] }
   })
@@ -144,6 +189,7 @@ function registerIpc() {
       return null
     }
     addRecent(dir)
+    currentRoot = dir
     startWatching(dir, event.sender)
     return { path: dir }
   })
@@ -180,6 +226,20 @@ function registerIpc() {
   })
   ipcMain.handle('mccode:reveal', async (_event, target) => {
     shell.showItemInFolder(target)
+  })
+  ipcMain.handle('mccode:git-check', async () => {
+    const result = await runGit(['--version'], currentRoot ?? app.getPath('home'))
+    if (result.code !== 0) return { available: false, version: '' }
+    return { available: true, version: result.stdout.trim() }
+  })
+  ipcMain.handle('mccode:git-run', async (_event, args) => {
+    if (!currentRoot) return { code: -1, stdout: '', stderr: 'No folder opened' }
+    try {
+      validateGitArgs(args, currentRoot)
+    } catch (error) {
+      return { code: -1, stdout: '', stderr: String(error.message) }
+    }
+    return runGit(args, currentRoot)
   })
   ipcMain.on('mccode:set-dirty', (_event, dirty) => {
     hasUnsaved = Boolean(dirty)

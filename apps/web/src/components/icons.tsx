@@ -133,3 +133,22 @@ export function IconList({ size = 20 }: { size?: number }) {
     </svg>
   )
 }
+
+export function IconSourceControl({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    >
+      <circle cx="7" cy="6" r="2.2" />
+      <circle cx="7" cy="18" r="2.2" />
+      <circle cx="17" cy="9" r="2.2" />
+      <path d="M7 8.2v7.6M9.2 6h4.3a1.5 1.5 0 0 1 1.5 1.5v0" strokeLinecap="round" />
+      <path d="M17 11.2v3.1a3 3 0 0 1-3 3h-4.8" strokeLinecap="round" />
+    </svg>
+  )
+}
