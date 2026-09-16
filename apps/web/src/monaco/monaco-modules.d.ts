@@ -1,0 +1,6 @@
+declare module 'monaco-editor/esm/vs/editor/editor.all.js'
+declare module 'monaco-editor/esm/vs/language/json/monaco.contribution'
+declare module 'monaco-editor/esm/vs/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js'
+declare module 'monaco-editor/esm/vs/editor/standalone/browser/quickAccess/standaloneGotoLineQuickAccess.js'
+declare module 'monaco-editor/esm/vs/editor/standalone/browser/quickAccess/standaloneGotoSymbolQuickAccess.js'
+declare module 'monaco-editor/esm/vs/editor/standalone/browser/quickAccess/standaloneHelpQuickAccess.js'

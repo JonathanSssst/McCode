@@ -1,0 +1,30 @@
+{
+  "name": "mccode",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A VSCode-like Minecraft datapack editor",
+  "author": "MCCode",
+  "main": "apps/desktop/main.cjs",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @mccode/web",
+    "build": "npm run build -w @mccode/web",
+    "preview": "npm run preview -w @mccode/web",
+    "typecheck": "npm run typecheck -w @mccode/web",
+    "test": "npm run test -w @mccode/web",
+    "lint": "npm run lint -w @mccode/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "e2e": "playwright test",
+    "desktop": "npm run build && electron apps/desktop/main.cjs",
+    "desktop:dist": "npm run build && electron-builder --config apps/desktop/electron-builder.yml"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}
