@@ -1,7 +1,7 @@
 import { namespaceOf, selectRelatedPaths } from '@/lib/ai/context'
 import { hashKey, LruCache } from '@/lib/ai/cache'
 import { isAbortError, requestChatCompletion } from '@/lib/ai/client'
-import { resolveConfig } from '@/lib/ai/config'
+import { desktopAi, resolveConfig } from '@/lib/ai/config'
 import { buildMessages, type RelatedFile } from '@/lib/ai/prompt'
 import { cleanCompletion } from '@/lib/ai/validate'
 import { getProvider } from '@/lib/provider'
@@ -66,8 +66,10 @@ const provider: monaco.languages.InlineCompletionsProvider = {
   async provideInlineCompletions(model, position, _context, token) {
     const state = useWorkspace.getState()
     const settings = state.settings.ai
-    const config = settings.enabled ? resolveConfig(settings) : null
-    if (!config) return EMPTY
+    if (!settings.enabled) return EMPTY
+    const config = resolveConfig(settings)
+    const keyReady = desktopAi() ? state.aiKeyConfigured : Boolean(config.apiKey)
+    if (!keyReady) return EMPTY
     const language = model.getLanguageId()
     if (language !== 'mcfunction' && language !== 'json') return EMPTY
 

@@ -13,6 +13,18 @@ interface MccodeDesktopBridge {
   reveal(path: string): Promise<void>
   gitCheck(): Promise<{ available: boolean; version: string }>
   gitRun(args: string[]): Promise<{ code: number; stdout: string; stderr: string }>
+  aiStatus?(): Promise<{ encryption: boolean; configured: boolean; baseUrl: string; model: string }>
+  aiSetKey?(key: string): Promise<{ ok: boolean; configured?: boolean; error?: string }>
+  aiClearKey?(): Promise<{ ok: boolean; configured?: boolean; error?: string }>
+  aiComplete?(request: {
+    id: string
+    baseUrl?: string
+    model?: string
+    messages: { role: string; content: string }[]
+    maxTokens?: number
+    temperature?: number
+  }): Promise<{ ok: boolean; content?: string; error?: string }>
+  aiCancel?(id: string): Promise<boolean>
   setDirty(dirty: boolean): void
   windowMinimize(): void
   windowToggleMaximize(): void

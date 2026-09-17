@@ -5,6 +5,10 @@ export interface AiSettings {
   temperature: number
   includeProjectContext: boolean
   maxContextFiles: number
+  /** Empty means: use the env/default value. */
+  baseUrl: string
+  /** Empty means: use the env/default value. */
+  model: string
 }
 
 export interface AiConfig extends AiSettings {
@@ -29,4 +33,6 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   temperature: 0.2,
   includeProjectContext: true,
   maxContextFiles: 4,
+  baseUrl: '',
+  model: '',
 }

@@ -1,3 +1,4 @@
+import { desktopAi } from './config'
 import type { AiConfig, ChatMessage } from './types'
 
 export class AiRequestError extends Error {}
@@ -16,11 +17,42 @@ export function isAbortError(error: unknown): boolean {
       )
 }
 
+async function requestViaDesktop(
+  bridge: MccodeDesktopBridge,
+  config: AiConfig,
+  messages: ChatMessage[],
+  signal?: AbortSignal,
+): Promise<string> {
+  const id = `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const abort = () => void bridge.aiCancel?.(id)
+  if (signal) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+    signal.addEventListener('abort', abort, { once: true })
+  }
+  try {
+    const result = await bridge.aiComplete!({
+      id,
+      baseUrl: config.baseUrl,
+      model: config.model,
+      messages,
+      maxTokens: config.maxTokens,
+      temperature: config.temperature,
+    })
+    if (!result.ok) throw new AiRequestError(result.error ?? 'AI request failed')
+    return result.content ?? ''
+  } finally {
+    signal?.removeEventListener('abort', abort)
+  }
+}
+
 export async function requestChatCompletion(
   config: AiConfig,
   messages: ChatMessage[],
   options: RequestOptions = {},
 ): Promise<string> {
+  const bridge = desktopAi()
+  if (bridge) return requestViaDesktop(bridge, config, messages, options.signal)
+
   const { signal, timeoutMs = 30000, fetchImpl = fetch } = options
   const controller = new AbortController()
   const abort = () => controller.abort()

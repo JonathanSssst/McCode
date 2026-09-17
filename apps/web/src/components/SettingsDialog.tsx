@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useT } from '@/i18n'
-import { DEFAULT_MODEL, isConfigured } from '@/lib/ai/config'
+import { DEFAULT_MODEL, desktopAi } from '@/lib/ai/config'
 import type { AppSettings } from '@/lib/settings'
 import { useWorkspace } from '@/store/workspace'
 
@@ -39,7 +39,14 @@ export function SettingsDialog() {
   const gameVersion = useWorkspace((s) => s.gameVersion)
   const setGameVersion = useWorkspace((s) => s.setGameVersion)
   const importSettings = useWorkspace((s) => s.importSettings)
+  const aiConfigured = useWorkspace((s) => s.aiKeyConfigured)
+  const aiKeyEncryption = useWorkspace((s) => s.aiKeyEncryption)
+  const aiKeyError = useWorkspace((s) => s.aiKeyError)
+  const saveAiKey = useWorkspace((s) => s.saveAiKey)
+  const clearAiKey = useWorkspace((s) => s.clearAiKey)
+  const [keyInput, setKeyInput] = useState('')
   const tr = useT()
+  const aiStorage = Boolean(desktopAi())
 
   const exportSettings = () => {
     const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' })
@@ -64,7 +71,6 @@ export function SettingsDialog() {
 
   if (!visible) return null
   const editor = settings.editor
-  const aiConfigured = isConfigured()
 
   return (
     <div className="fixed inset-0 z-[70] flex justify-center bg-black/40 pt-[7vh]" onClick={close}>
@@ -276,18 +282,91 @@ export function SettingsDialog() {
                 onChange={(e) => update({ ai: { enabled: e.target.checked } })}
               />
             </Row>
-            <Row label={tr('settings.aiKey')}>
-              <span
-                className={`max-w-[320px] text-right text-[12px] ${
-                  aiConfigured ? 'text-[#4ec9b0]' : 'text-[#f48771]'
+            {aiStorage ? (
+              <Row label={tr('settings.aiKey')} hint={tr('settings.aiKeyHint')}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    value={keyInput}
+                    spellCheck={false}
+                    placeholder={tr('settings.aiKeyPlaceholder')}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && keyInput.trim()) void saveAiKey(keyInput)
+                    }}
+                    className={`${inputClass} w-56`}
+                  />
+                  <button
+                    className="rounded bg-vsc-accent px-2 py-1 text-[12px] text-white hover:brightness-110 disabled:opacity-40"
+                    disabled={!keyInput.trim() || !aiKeyEncryption}
+                    onClick={() => {
+                      void saveAiKey(keyInput)
+                      setKeyInput('')
+                    }}
+                  >
+                    {tr('settings.aiKeySave')}
+                  </button>
+                  {aiConfigured && (
+                    <button
+                      className="rounded px-2 py-1 text-[12px] text-vsc-fg hover:bg-white/10"
+                      onClick={() => void clearAiKey()}
+                    >
+                      {tr('settings.aiKeyClear')}
+                    </button>
+                  )}
+                </div>
+              </Row>
+            ) : (
+              <Row label={tr('settings.aiKey')}>
+                <span
+                  className={`max-w-[320px] text-right text-[12px] ${
+                    aiConfigured ? 'text-[#4ec9b0]' : 'text-[#f48771]'
+                  }`}
+                >
+                  {aiConfigured
+                    ? tr('settings.aiKeySet', {
+                        model: import.meta.env.VITE_DEEPSEEK_MODEL || DEFAULT_MODEL,
+                      })
+                    : tr('settings.aiKeyMissing')}
+                </span>
+              </Row>
+            )}
+            {aiStorage && (
+              <div
+                className={`text-[11px] ${
+                  aiKeyError
+                    ? 'text-[#f48771]'
+                    : aiConfigured
+                      ? 'text-[#4ec9b0]'
+                      : 'text-vsc-fg-dim'
                 }`}
               >
-                {aiConfigured
-                  ? tr('settings.aiKeySet', {
-                      model: import.meta.env.VITE_DEEPSEEK_MODEL || DEFAULT_MODEL,
-                    })
-                  : tr('settings.aiKeyMissing')}
-              </span>
+                {aiKeyError
+                  ? aiKeyError
+                  : !aiKeyEncryption
+                    ? tr('settings.aiKeyUnavailable')
+                    : aiConfigured
+                      ? tr('settings.aiKeyStored')
+                      : tr('settings.aiKeyNotStored')}
+              </div>
+            )}
+            <Row label={tr('settings.aiBaseUrl')} hint={tr('settings.aiBaseUrlHint')}>
+              <input
+                value={settings.ai.baseUrl}
+                spellCheck={false}
+                placeholder="https://api.deepseek.com"
+                onChange={(e) => update({ ai: { baseUrl: e.target.value } })}
+                className={`${inputClass} w-64 font-mono`}
+              />
+            </Row>
+            <Row label={tr('settings.aiModel')} hint={tr('settings.aiModelHint')}>
+              <input
+                value={settings.ai.model}
+                spellCheck={false}
+                placeholder="deepseek-chat"
+                onChange={(e) => update({ ai: { model: e.target.value } })}
+                className={`${inputClass} w-64 font-mono`}
+              />
             </Row>
             <Row label={tr('settings.aiMaxTokens')}>
               <input

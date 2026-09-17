@@ -116,6 +116,7 @@ export default function App() {
   useEffect(() => {
     void useWorkspace.getState().loadRecentFolders()
     void useWorkspace.getState().checkGitAvailability()
+    void useWorkspace.getState().refreshAiKeyStatus()
   }, [])
 
   useEffect(() => {

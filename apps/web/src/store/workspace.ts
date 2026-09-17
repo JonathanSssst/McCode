@@ -19,6 +19,12 @@ import { applyTextEdits } from '@/lib/textEdits'
 import type { SpyDiagnostic, SpyRange, SpyTextEdit } from '@/spyglass/client'
 import { createFileActions } from './fileActions'
 import { createGitActions, initialGitState, type GitActions, type GitState } from './gitSlice'
+import {
+  createAiKeyActions,
+  initialAiKeyState,
+  type AiKeyActions,
+  type AiKeyState,
+} from './aiKeySlice'
 import { handleDiagnostics, loadSpyglass, startWatching, stopWatching } from './helpers'
 
 let providersRegistered = false
@@ -63,7 +69,7 @@ export interface PromptDialogState {
 
 const emptyPack: PackInfo = { packFormat: null, supportedFormats: null, description: null }
 
-export interface WorkspaceState extends GitState, GitActions {
+export interface WorkspaceState extends GitState, GitActions, AiKeyState, AiKeyActions {
   rootName: string | null
   pack: PackInfo
   tree: TreeNode[]
@@ -201,12 +207,14 @@ export const useWorkspace = create<WorkspaceState>()(
     pendingReveal: null,
     statusMessage: 'Ready',
     ...initialGitState,
+    ...initialAiKeyState,
     aiStatus: 'idle',
     aiMessage: '',
     cursor: { line: 1, column: 1, selectionLength: 0 },
 
     ...createFileActions(set, get),
     ...createGitActions(set, get),
+    ...createAiKeyActions(set, get),
 
     openFolder: async (path) => {
       const provider = getProvider()

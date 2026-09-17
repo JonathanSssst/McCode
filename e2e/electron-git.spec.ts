@@ -17,6 +17,7 @@ interface GitResult {
 test('main process git IPC runs against a real repository', async () => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'mccode-ipc-'))
   const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'mccode-ipc-remote-'))
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'mccode-ipc-userdata-'))
   execFileSync('git', ['init', '--bare'], { cwd: remote })
   execFileSync('git', ['init'], { cwd: repo })
   execFileSync('git', ['config', 'user.name', 'MCCode'], { cwd: repo })
@@ -24,7 +25,8 @@ test('main process git IPC runs against a real repository', async () => {
   fs.writeFileSync(path.join(repo, 'a.mcfunction'), 'say hi\n')
 
   const app = await electron.launch({
-    args: [path.resolve(process.cwd(), 'apps/desktop/main.cjs')],
+    // A private user-data dir avoids the single-instance lock and isolates state.
+    args: [path.resolve(process.cwd(), 'apps/desktop/main.cjs'), `--user-data-dir=${userData}`],
     cwd: process.cwd(),
   })
   try {
@@ -94,5 +96,6 @@ test('main process git IPC runs against a real repository', async () => {
     await app.close()
     fs.rmSync(repo, { recursive: true, force: true })
     fs.rmSync(remote, { recursive: true, force: true })
+    fs.rmSync(userData, { recursive: true, force: true })
   }
 })

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, dialog, ipcMain, safeStorage } = require('electron')
 const http = require('node:http')
 const fs = require('node:fs')
 const fsp = require('node:fs/promises')
@@ -174,6 +174,41 @@ function runGit(args, cwd) {
   })
 }
 
+const AI_DEFAULT_BASE_URL = 'https://api.deepseek.com'
+const AI_DEFAULT_MODEL = 'deepseek-chat'
+
+const aiRequests = new Map()
+
+const aiStorePath = () => path.join(app.getPath('userData'), 'ai.json')
+
+function readAiKey() {
+  if (!safeStorage.isEncryptionAvailable()) return ''
+  try {
+    const raw = JSON.parse(fs.readFileSync(aiStorePath(), 'utf8'))
+    if (!raw || typeof raw.key !== 'string' || !raw.key) return ''
+    return safeStorage.decryptString(Buffer.from(raw.key, 'base64'))
+  } catch {
+    return ''
+  }
+}
+
+function writeAiKey(key) {
+  const file = aiStorePath()
+  if (!key) {
+    try {
+      fs.rmSync(file, { force: true })
+    } catch {
+      // ignore
+    }
+    return
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('OS credential encryption is unavailable')
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify({ key: safeStorage.encryptString(key).toString('base64') }))
+}
+
 function registerIpc() {
   ipcMain.handle('mccode:openFolder', async (event) => {
     const result = await dialog.showOpenDialog({
@@ -244,6 +279,80 @@ function registerIpc() {
       return { code: -1, stdout: '', stderr: String(error.message) }
     }
     return runGit(args, currentRoot)
+  })
+  ipcMain.handle('mccode:ai-status', () => ({
+    encryption: safeStorage.isEncryptionAvailable(),
+    configured: Boolean(readAiKey()),
+    baseUrl: AI_DEFAULT_BASE_URL,
+    model: AI_DEFAULT_MODEL,
+  }))
+  ipcMain.handle('mccode:ai-set-key', (_event, key) => {
+    try {
+      writeAiKey(typeof key === 'string' ? key.trim() : '')
+      return { ok: true, configured: Boolean(readAiKey()) }
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) }
+    }
+  })
+  ipcMain.handle('mccode:ai-clear-key', () => {
+    try {
+      writeAiKey('')
+      return { ok: true, configured: false }
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) }
+    }
+  })
+  ipcMain.handle('mccode:ai-cancel', (_event, id) => {
+    const controller = aiRequests.get(String(id))
+    if (controller) {
+      controller.abort()
+      aiRequests.delete(String(id))
+    }
+    return true
+  })
+  ipcMain.handle('mccode:ai-complete', async (_event, request) => {
+    // The API key never leaves the main process.
+    const apiKey = readAiKey()
+    if (!apiKey) return { ok: false, error: 'AI key is not configured' }
+    const { id, baseUrl, model, messages, maxTokens, temperature } = request ?? {}
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return { ok: false, error: 'empty messages' }
+    }
+    const endpoint = `${String(baseUrl || AI_DEFAULT_BASE_URL).replace(/\/+$/, '')}/chat/completions`
+    if (!/^https?:\/\//.test(endpoint)) return { ok: false, error: 'invalid base url' }
+
+    const requestId = String(id ?? Date.now())
+    const controller = new AbortController()
+    aiRequests.set(requestId, controller)
+    const timer = setTimeout(() => controller.abort(), 60000)
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: model || AI_DEFAULT_MODEL,
+          messages,
+          max_tokens: Number(maxTokens) || 128,
+          temperature: typeof temperature === 'number' ? temperature : 0.2,
+          stream: false,
+        }),
+        signal: controller.signal,
+      })
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '')
+        return {
+          ok: false,
+          error: `AI request failed (${response.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`,
+        }
+      }
+      const data = await response.json()
+      return { ok: true, content: data?.choices?.[0]?.message?.content ?? '' }
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error) }
+    } finally {
+      clearTimeout(timer)
+      aiRequests.delete(requestId)
+    }
   })
   ipcMain.on('mccode:set-dirty', (_event, dirty) => {
     hasUnsaved = Boolean(dirty)

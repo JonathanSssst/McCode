@@ -1,5 +1,4 @@
 import { useT } from '@/i18n'
-import { isConfigured } from '@/lib/ai/config'
 import { fileName } from '@/lib/languages'
 import { versionLabelForPackFormat } from '@/lib/pack'
 import { useWorkspace } from '@/store/workspace'
@@ -18,7 +17,7 @@ export function StatusBar() {
   const aiMessage = useWorkspace((s) => s.aiMessage)
   const aiEnabled = useWorkspace((s) => s.settings.ai.enabled)
   const openSettings = useWorkspace((s) => s.openSettings)
-  const aiConfigured = isConfigured()
+  const aiConfigured = useWorkspace((s) => s.aiKeyConfigured)
   const gitRepo = useWorkspace((s) => s.gitRepo)
   const gitBranch = useWorkspace((s) => s.gitBranch)
   const gitDetached = useWorkspace((s) => s.gitDetached)
