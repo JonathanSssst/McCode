@@ -23,8 +23,13 @@ const GIT_SUBCOMMANDS = new Set([
   'remote',
 ])
 
+// `-c` is intentionally allowed: it can only be a per-subcommand option here,
+// because the subcommand is always the first argument (the dangerous global
+// `git -c key=value <cmd>` form is impossible from this API).
 const FORBIDDEN_GIT_FLAG =
-  /^--?(?:c|config-env|exec-path|upload-pack|receive-pack|git-dir|work-tree|namespace|no-index|rules)\b/
+  /^--?(?:config-env|exec-path|upload-pack|receive-pack|git-dir|work-tree|namespace|no-index|rules)\b/
+
+const WINDOWS_ABSOLUTE = /^[A-Za-z]:[\\/]/
 
 function assertInsideRoot(root, target) {
   const rootResolved = path.resolve(root)
@@ -50,7 +55,7 @@ function validateGitArgs(args, root) {
   }
   for (const arg of rest) {
     const colon = arg.indexOf(':')
-    if (colon > 0 && !arg.startsWith('-') && !arg.includes('://')) {
+    if (colon > 0 && !arg.startsWith('-') && !arg.includes('://') && !WINDOWS_ABSOLUTE.test(arg)) {
       assertInsideRoot(root, arg.slice(colon + 1))
     }
   }

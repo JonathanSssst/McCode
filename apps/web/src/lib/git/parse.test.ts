@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseBranchList, parseGitLog, parseGitStatus } from './parse'
+import {
+  parseBranchList,
+  parseBranchRefs,
+  parseGitLog,
+  parseGitStatus,
+  parseRemotes,
+} from './parse'
 import { isStaged, isUnstaged, kindForCode } from './types'
 
 const NUL = '\0'
@@ -119,6 +125,40 @@ describe('parseGitLog', () => {
 describe('parseBranchList', () => {
   it('splits and trims lines', () => {
     expect(parseBranchList('main\nfeature/x\n\n')).toEqual(['main', 'feature/x'])
+  })
+})
+
+describe('parseRemotes', () => {
+  it('deduplicates the fetch and push entries', () => {
+    const raw = [
+      'origin\thttps://github.com/user/repo.git (fetch)',
+      'origin\thttps://github.com/user/repo.git (push)',
+      'upstream\tgit@github.com:other/repo.git (fetch)',
+      'upstream\tgit@github.com:other/repo.git (push)',
+    ].join('\n')
+    expect(parseRemotes(raw)).toEqual([
+      { name: 'origin', url: 'https://github.com/user/repo.git' },
+      { name: 'upstream', url: 'git@github.com:other/repo.git' },
+    ])
+  })
+
+  it('returns an empty list for empty output', () => {
+    expect(parseRemotes('')).toEqual([])
+  })
+})
+
+describe('parseBranchRefs', () => {
+  it('parses name, upstream and current marker and puts the current branch first', () => {
+    const raw = ['main origin/main *', 'feature/x', 'wip origin/wip'].join('\n')
+    expect(parseBranchRefs(raw)).toEqual([
+      { name: 'main', upstream: 'origin/main', current: true },
+      { name: 'feature/x', upstream: null, current: false },
+      { name: 'wip', upstream: 'origin/wip', current: false },
+    ])
+  })
+
+  it('ignores blank lines', () => {
+    expect(parseBranchRefs('\n\n')).toEqual([])
   })
 })
 

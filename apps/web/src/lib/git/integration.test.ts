@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { parseGitStatus } from './parse'
+import { parseBranchRefs, parseGitStatus, parseRemotes } from './parse'
 import { isStaged, isUnstaged } from './types'
 
 function gitAvailable(): boolean {
@@ -85,5 +85,72 @@ describeIfGit('git status integration', () => {
     expect(modified).toBeDefined()
     expect(isStaged(modified!)).toBe(true)
     expect(isUnstaged(modified!)).toBe(false)
+  })
+
+  it('pushes to a local bare remote, tracks upstream and reports ahead/behind', () => {
+    const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mccode-remote-'))
+    const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mccode-clone-'))
+    try {
+      execFileSync('git', ['init', '--bare'], { cwd: remoteDir })
+      const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).trim()
+
+      git(['remote', 'add', 'origin', remoteDir])
+      expect(parseRemotes(git(['remote', '-v']))).toContainEqual({ name: 'origin', url: remoteDir })
+
+      git(['push', '-u', 'origin', branch])
+      const refs = parseBranchRefs(
+        git(['for-each-ref', '--format=%(refname:short) %(upstream:short) %(HEAD)', 'refs/heads']),
+      )
+      const current = refs.find((ref) => ref.current)
+      expect(current?.name).toBe(branch)
+      expect(current?.upstream).toBe(`origin/${branch}`)
+
+      fs.writeFileSync(path.join(repo, 'later.txt'), 'later\n')
+      git(['add', '-A'])
+      git(['commit', '-m', 'later commit'])
+      let status = parseGitStatus(git(['status', '--porcelain=v2', '--branch', '-z']))
+      expect(status.ahead).toBe(1)
+      expect(status.behind).toBe(0)
+
+      execFileSync('git', ['clone', remoteDir, '.'], { cwd: cloneDir })
+      execFileSync('git', ['config', 'user.name', 'MCCode Test'], { cwd: cloneDir })
+      execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: cloneDir })
+      fs.writeFileSync(path.join(cloneDir, 'from-clone.txt'), 'clone\n')
+      execFileSync('git', ['add', '-A'], { cwd: cloneDir })
+      execFileSync('git', ['commit', '-m', 'from clone'], { cwd: cloneDir })
+      execFileSync('git', ['push'], { cwd: cloneDir })
+
+      git(['fetch', '--all', '--prune'])
+      status = parseGitStatus(git(['status', '--porcelain=v2', '--branch', '-z']))
+      expect(status.ahead).toBe(1)
+      expect(status.behind).toBe(1)
+    } finally {
+      fs.rmSync(remoteDir, { recursive: true, force: true })
+      fs.rmSync(cloneDir, { recursive: true, force: true })
+    }
+  })
+
+  it('exposes the committed version of a file through show HEAD:<path>', () => {
+    const filePath = 'data/mypack/function/diff.mcfunction'
+    fs.writeFileSync(path.join(repo, filePath), 'say committed\n')
+    git(['add', '--', filePath])
+    git(['commit', '-m', 'add diff.mcfunction'])
+    fs.writeFileSync(path.join(repo, filePath), 'say working\n')
+
+    expect(git(['show', `HEAD:${filePath}`])).toBe('say committed\n')
+    expect(fs.readFileSync(path.join(repo, filePath), 'utf8')).toBe('say working\n')
+  })
+
+  it('creates and switches branches', () => {
+    git(['switch', '-c', 'feature/test'])
+    expect(git(['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe('feature/test')
+
+    const other = parseBranchRefs(
+      git(['for-each-ref', '--format=%(refname:short) %(upstream:short) %(HEAD)', 'refs/heads']),
+    ).find((ref) => !ref.current)
+    expect(other).toBeDefined()
+
+    git(['switch', other!.name])
+    expect(git(['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe(other!.name)
   })
 })

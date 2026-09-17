@@ -4,6 +4,7 @@ import { ActivityBar } from '@/components/ActivityBar'
 import { CommandPalette } from '@/components/CommandPalette'
 import { ContextMenu } from '@/components/ContextMenu'
 import { DataBrowser } from '@/components/DataBrowser'
+import { DiffPane } from '@/components/DiffPane'
 import { EditorPane } from '@/components/EditorPane'
 import { EditorTabs } from '@/components/EditorTabs'
 import { FileExplorer } from '@/components/FileExplorer'
@@ -11,6 +12,7 @@ import { InputDialog } from '@/components/InputDialog'
 import { NewPackDialog } from '@/components/NewPackDialog'
 import { OutlineView } from '@/components/OutlineView'
 import { Panel } from '@/components/Panel'
+import { PromptDialog } from '@/components/PromptDialog'
 import { SearchView } from '@/components/SearchView'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { SourceControlView } from '@/components/SourceControlView'
@@ -103,6 +105,7 @@ export default function App() {
   const setPanelHeight = useWorkspace((s) => s.setPanelHeight)
   const persistLayout = useWorkspace((s) => s.persistLayout)
   const activeView = useWorkspace((s) => s.activeView)
+  const diffOpen = useWorkspace((s) => Boolean(s.gitDiff))
   const anyDirty = useWorkspace((s) => s.openFiles.some((file) => file.dirty))
   const language = useWorkspace((s) => s.settings.language)
 
@@ -200,7 +203,10 @@ export default function App() {
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <EditorTabs />
-          <EditorPane />
+          <div className="relative flex min-h-0 flex-1">
+            <EditorPane />
+            {diffOpen && <DiffPane />}
+          </div>
           {panelVisible && (
             <>
               <Splitter
@@ -222,6 +228,7 @@ export default function App() {
       <CommandPalette />
       <InputDialog />
       <NewPackDialog />
+      <PromptDialog />
       <ContextMenu />
       <SettingsDialog />
     </div>

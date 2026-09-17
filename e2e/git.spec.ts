@@ -34,6 +34,20 @@ test.beforeEach(async ({ page }) => {
         state.staged = false
         return { code: 0, stdout: '', stderr: '' }
       }
+      if (sub === 'for-each-ref') {
+        return { code: 0, stdout: 'main origin/main *\nfeature/x\n', stderr: '' }
+      }
+      if (sub === 'show') {
+        return { code: 0, stdout: 'say original\n', stderr: '' }
+      }
+      if (sub === 'remote') {
+        return {
+          code: 0,
+          stdout:
+            'origin\thttps://example.com/repo.git (fetch)\norigin\thttps://example.com/repo.git (push)\n',
+          stderr: '',
+        }
+      }
       return { code: 0, stdout: '', stderr: '' }
     }
     const bridge = {
@@ -92,7 +106,8 @@ test('source control lists changes, stages and commits', async ({ page }) => {
   await expect(scm).toContainText('2', { timeout: 20000 })
 
   await scm.click()
-  await expect(page.getByText('main', { exact: true })).toBeVisible()
+  // The branch also appears in the status bar, so scope to the first match (sidebar).
+  await expect(page.getByText('⑂ main').first()).toBeVisible()
   await expect(page.getByText('main.mcfunction')).toBeVisible()
   await expect(page.getByText('extra.mcfunction')).toBeVisible()
   await expect(page.getByText('Changes', { exact: true })).toBeVisible()
@@ -124,4 +139,53 @@ test('status bar shows the current branch', async ({ page }) => {
   await expect(page.locator('button[title^="Git branch"]')).toContainText('main', {
     timeout: 20000,
   })
+})
+
+test('clicking a changed file opens the diff view', async ({ page }) => {
+  const calls = () =>
+    page.evaluate(() => (window as unknown as { __gitCalls: string[][] }).__gitCalls)
+
+  const scm = page.locator('button[title^="Source Control"]')
+  await expect(scm).toContainText('2', { timeout: 20000 })
+  await scm.click()
+
+  await page.getByText('main.mcfunction').click()
+  await expect
+    .poll(async () =>
+      (await calls()).some(
+        (args) => args[0] === 'show' && args[1] === 'HEAD:data/mypack/function/main.mcfunction',
+      ),
+    )
+    .toBe(true)
+
+  const diff = page.locator('.monaco-diff-editor')
+  await expect(diff).toBeVisible({ timeout: 20000 })
+  await expect(diff).toContainText('say original')
+  await expect(diff).toContainText('say hello')
+
+  await page.locator('button[title="Close Diff"]').click()
+  await expect(diff).toHaveCount(0)
+})
+
+test('push, fetch and branch switching are wired', async ({ page }) => {
+  const calls = () =>
+    page.evaluate(() => (window as unknown as { __gitCalls: string[][] }).__gitCalls)
+
+  const scm = page.locator('button[title^="Source Control"]')
+  await expect(scm).toContainText('2', { timeout: 20000 })
+  await scm.click()
+
+  await page.locator('button[title="Push"]').click()
+  await expect.poll(async () => (await calls()).some((args) => args[0] === 'push')).toBe(true)
+
+  await page.locator('button[title="Fetch Remote Changes"]').click()
+  await expect.poll(async () => (await calls()).some((args) => args[0] === 'fetch')).toBe(true)
+
+  await page.locator('button[title="More Actions"]').click()
+  await page.getByRole('button', { name: /feature\/x/ }).click()
+  await expect
+    .poll(async () =>
+      (await calls()).some((args) => args[0] === 'switch' && args[1] === 'feature/x'),
+    )
+    .toBe(true)
 })

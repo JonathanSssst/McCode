@@ -1,31 +1,8 @@
 import { useT } from '@/i18n'
-import { isStaged, isUnstaged, type GitChangeKind, type GitFileChange } from '@/lib/git/types'
+import { GIT_LETTER, GIT_TINT } from '@/lib/git/labels'
+import { isStaged, isUnstaged, type GitFileChange } from '@/lib/git/types'
 import { findNode } from '@/lib/tree'
 import { useWorkspace } from '@/store/workspace'
-
-const LETTER: Record<GitChangeKind, string> = {
-  modified: 'M',
-  added: 'A',
-  deleted: 'D',
-  renamed: 'R',
-  copied: 'C',
-  typechange: 'T',
-  unmerged: 'U',
-  untracked: 'U',
-  unknown: '?',
-}
-
-const TINT: Record<GitChangeKind, string> = {
-  modified: 'text-[#e2c08d]',
-  added: 'text-[#73c991]',
-  deleted: 'text-[#f48771]',
-  renamed: 'text-[#73c991]',
-  copied: 'text-[#73c991]',
-  typechange: 'text-[#e2c08d]',
-  unmerged: 'text-[#f48771]',
-  untracked: 'text-[#73c991]',
-  unknown: 'text-vsc-fg-dim',
-}
 
 function baseName(path: string): string {
   const index = path.lastIndexOf('/')
@@ -40,21 +17,26 @@ function dirName(path: string): string {
 function Row({
   change,
   onOpen,
+  onContextMenu,
   primary,
   secondary,
 }: {
   change: GitFileChange
   onOpen: () => void
+  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void
   primary?: { title: string; glyph: string; run: () => void }
   secondary?: { title: string; glyph: string; run: () => void }
 }) {
   return (
     <div
       onClick={onOpen}
+      onContextMenu={onContextMenu}
       title={change.origPath ? `${change.origPath} → ${change.path}` : change.path}
       className="group flex h-[22px] cursor-pointer items-center gap-2 px-3 text-[13px] text-vsc-fg hover:bg-[#2a2d2e]"
     >
-      <span className={`w-3 shrink-0 text-center ${TINT[change.kind]}`}>{LETTER[change.kind]}</span>
+      <span className={`w-3 shrink-0 text-center ${GIT_TINT[change.kind]}`}>
+        {GIT_LETTER[change.kind]}
+      </span>
       <span className="truncate">
         <span className="text-vsc-fg-dim">{dirName(change.path)}</span>
         {baseName(change.path)}
@@ -99,11 +81,14 @@ export function SourceControlView() {
   const upstream = useWorkspace((s) => s.gitUpstream)
   const ahead = useWorkspace((s) => s.gitAhead)
   const behind = useWorkspace((s) => s.gitBehind)
-  const files = useWorkspace((s) => s.gitFiles)
+  const branches = useWorkspace((s) => s.gitBranches)
+  const remotes = useWorkspace((s) => s.gitRemotes)
   const loading = useWorkspace((s) => s.gitLoading)
+  const action = useWorkspace((s) => s.gitAction)
   const error = useWorkspace((s) => s.gitError)
   const message = useWorkspace((s) => s.gitCommitMessage)
   const tree = useWorkspace((s) => s.tree)
+  const files = useWorkspace((s) => s.gitFiles)
 
   const setMessage = useWorkspace((s) => s.setGitCommitMessage)
   const refresh = useWorkspace((s) => s.refreshGit)
@@ -115,10 +100,24 @@ export function SourceControlView() {
   const unstageAll = useWorkspace((s) => s.unstageAllGit)
   const commit = useWorkspace((s) => s.commitGit)
   const openFile = useWorkspace((s) => s.openFile)
+  const fetchGit = useWorkspace((s) => s.fetchGit)
+  const pullGit = useWorkspace((s) => s.pullGit)
+  const pushGit = useWorkspace((s) => s.pushGit)
+  const switchGitBranch = useWorkspace((s) => s.switchGitBranch)
+  const createGitBranch = useWorkspace((s) => s.createGitBranch)
+  const addGitRemote = useWorkspace((s) => s.addGitRemote)
+  const openContextMenu = useWorkspace((s) => s.openContextMenu)
+  const openPrompt = useWorkspace((s) => s.openPrompt)
+  const openGitDiff = useWorkspace((s) => s.openGitDiff)
+  const copyPath = useWorkspace((s) => s.copyPath)
 
   const open = (path: string) => {
+    void openGitDiff(path)
+  }
+
+  const openInEditor = (path: string) => {
     const node = findNode(tree, path)
-    if (node) void openFile(node, { preview: true })
+    if (node) void openFile(node, { preview: false })
   }
 
   const staged = files.filter(isStaged)
@@ -136,6 +135,67 @@ export function SourceControlView() {
     void discard([path])
   }
 
+  const rowMenu = (event: React.MouseEvent<HTMLDivElement>, change: GitFileChange) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const isChangeStaged = isStaged(change)
+    openContextMenu(event.clientX, event.clientY, [
+      { label: tr('scm.openDiff'), run: () => open(change.path) },
+      { label: tr('scm.openFile'), run: () => openInEditor(change.path) },
+      { separator: true },
+      isChangeStaged
+        ? { label: tr('scm.unstage'), run: () => void unstage([change.path]) }
+        : { label: tr('scm.stage'), run: () => void stage([change.path]) },
+      ...(isChangeStaged
+        ? []
+        : [
+            {
+              label: tr('scm.discard'),
+              danger: true,
+              run: () => discardWithConfirm(change.path),
+            },
+          ]),
+      { separator: true },
+      { label: tr('ctx.copyPath'), run: () => void copyPath(change.path) },
+    ])
+  }
+
+  const openMoreMenu = (event: React.MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    openContextMenu(rect.left, rect.bottom + 2, [
+      { label: tr('scm.fetch'), run: () => void fetchGit() },
+      { label: tr('scm.pull'), run: () => void pullGit() },
+      { label: tr('scm.push'), run: () => void pushGit() },
+      { separator: true },
+      ...branches.slice(0, 15).map((item) => ({
+        label: `${item.current ? '✓ ' : '  '}${item.name}`,
+        run: () => void switchGitBranch(item.name),
+      })),
+      { separator: true },
+      {
+        label: tr('scm.newBranch'),
+        run: () =>
+          openPrompt({
+            title: tr('scm.newBranch'),
+            hint: tr('scm.newBranchHint'),
+            onConfirm: (value) => void createGitBranch(value),
+          }),
+      },
+      {
+        label: tr('scm.addRemote'),
+        run: () =>
+          openPrompt({
+            title: tr('scm.addRemote'),
+            hint: tr('scm.addRemoteHint'),
+            value: remotes.length === 0 ? 'origin ' : '',
+            onConfirm: (value) => void addGitRemote(value),
+          }),
+      },
+      { separator: true },
+      { label: tr('scm.refresh'), run: () => void refresh() },
+    ])
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-vsc-fg-dim">
@@ -146,7 +206,7 @@ export function SourceControlView() {
             onClick={() => void refresh()}
             className="hover:text-white"
           >
-            ↻
+            ⟳
           </button>
         )}
       </div>
@@ -173,7 +233,7 @@ export function SourceControlView() {
               className="truncate"
               title={detached ? tr('status.detachedTitle') : (branch ?? '')}
             >
-              {detached ? tr('scm.detached') : branch}
+              ⑂ {detached ? tr('scm.detached') : branch}
             </span>
             {upstream && (
               <span
@@ -184,6 +244,36 @@ export function SourceControlView() {
                 {behind > 0 ? `↓${behind}` : ''}
               </span>
             )}
+            <span className="ml-auto flex shrink-0 items-center gap-0.5 text-vsc-fg-dim">
+              <button
+                title={tr('scm.fetch')}
+                className="px-1 hover:text-white"
+                onClick={() => void fetchGit()}
+              >
+                ⟳
+              </button>
+              <button
+                title={tr('scm.pull')}
+                className="px-1 hover:text-white"
+                onClick={() => void pullGit()}
+              >
+                ↓
+              </button>
+              <button
+                title={tr('scm.push')}
+                className="px-1 hover:text-white"
+                onClick={() => void pushGit()}
+              >
+                ↑
+              </button>
+              <button
+                title={tr('scm.more')}
+                className="px-1 hover:text-white"
+                onClick={openMoreMenu}
+              >
+                ⋯
+              </button>
+            </span>
           </div>
 
           <textarea
@@ -213,7 +303,7 @@ export function SourceControlView() {
             <div
               className={`px-3 pb-1 text-[11px] ${error ? 'text-[#f48771]' : 'text-vsc-fg-dim'}`}
             >
-              {error || tr('scm.loading')}
+              {error || (action ? tr('scm.running', { action }) : tr('scm.loading'))}
             </div>
           )}
 
@@ -236,6 +326,7 @@ export function SourceControlView() {
                     key={`s-${change.path}`}
                     change={change}
                     onOpen={() => open(change.path)}
+                    onContextMenu={(event) => rowMenu(event, change)}
                     primary={{
                       title: tr('scm.unstage'),
                       glyph: '−',
@@ -264,6 +355,7 @@ export function SourceControlView() {
                     key={`w-${change.path}`}
                     change={change}
                     onOpen={() => open(change.path)}
+                    onContextMenu={(event) => rowMenu(event, change)}
                     primary={{
                       title: tr('scm.stage'),
                       glyph: '+',

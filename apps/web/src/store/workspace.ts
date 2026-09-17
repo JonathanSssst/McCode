@@ -45,6 +45,22 @@ export interface ContextMenuItem {
   run?: () => void
 }
 
+export interface PromptConfig {
+  title: string
+  value?: string
+  hint?: string
+  confirmLabel?: string
+  onConfirm: (value: string) => void
+}
+
+export interface PromptDialogState {
+  title: string
+  value: string
+  hint: string
+  confirmLabel: string
+  onConfirm: (value: string) => void
+}
+
 const emptyPack: PackInfo = { packFormat: null, supportedFormats: null, description: null }
 
 export interface WorkspaceState extends GitState, GitActions {
@@ -73,6 +89,7 @@ export interface WorkspaceState extends GitState, GitActions {
   renameDialog: { path: string; name: string } | null
   newFolderDialog: { path: string } | null
   newPackDialog: { namespace: string; packFormat: number; description: string } | null
+  promptDialog: PromptDialogState | null
   fileClipboard: { path: string } | null
   contextMenu: { x: number; y: number; items: ContextMenuItem[] } | null
   pendingReveal: { path: string; range: SpyRange } | null
@@ -96,6 +113,10 @@ export interface WorkspaceState extends GitState, GitActions {
   createFileAt: (path: string, content: string) => Promise<void>
   openNewPackDialog: () => void
   closeNewPackDialog: () => void
+  openPrompt: (config: PromptConfig) => void
+  setPromptValue: (value: string) => void
+  closePrompt: () => void
+  confirmPrompt: () => void
   setNewPackField: (
     patch: Partial<{ namespace: string; packFormat: number; description: string }>,
   ) => void
@@ -174,6 +195,7 @@ export const useWorkspace = create<WorkspaceState>()(
     renameDialog: null,
     newFolderDialog: null,
     newPackDialog: null,
+    promptDialog: null,
     fileClipboard: null,
     contextMenu: null,
     pendingReveal: null,
@@ -307,6 +329,7 @@ export const useWorkspace = create<WorkspaceState>()(
       if (existing) {
         set((s) => {
           s.activePath = node.path
+          s.gitDiff = null
           if (!preview) pinTab(s.openFiles, node.path)
         })
         return
@@ -328,6 +351,7 @@ export const useWorkspace = create<WorkspaceState>()(
           delete s.diagnostics[target.path]
         }
         s.activePath = node.path
+        s.gitDiff = null
       })
       if (replaced.path) {
         const replacedPath = replaced.path
@@ -363,6 +387,7 @@ export const useWorkspace = create<WorkspaceState>()(
     setActive: (path) => {
       set((s) => {
         s.activePath = path
+        s.gitDiff = null
       })
     },
 
@@ -599,6 +624,40 @@ export const useWorkspace = create<WorkspaceState>()(
         s.logs.push(`[${level}] ${message}`)
         if (s.logs.length > 500) s.logs.splice(0, s.logs.length - 500)
       })
+    },
+
+    openPrompt: (config) => {
+      set((s) => {
+        s.promptDialog = {
+          title: config.title,
+          value: config.value ?? '',
+          hint: config.hint ?? '',
+          confirmLabel: config.confirmLabel ?? '',
+          onConfirm: config.onConfirm,
+        }
+      })
+    },
+
+    setPromptValue: (value) => {
+      set((s) => {
+        if (s.promptDialog) s.promptDialog.value = value
+      })
+    },
+
+    closePrompt: () => {
+      set((s) => {
+        s.promptDialog = null
+      })
+    },
+
+    confirmPrompt: () => {
+      const dialog = get().promptDialog
+      if (!dialog) return
+      const value = dialog.value.trim()
+      set((s) => {
+        s.promptDialog = null
+      })
+      if (value) dialog.onConfirm(value)
     },
 
     openNewPackDialog: () => {

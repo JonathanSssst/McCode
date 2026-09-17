@@ -1,12 +1,16 @@
 import type { MouseEvent } from 'react'
+import { useMemo } from 'react'
 import { useT } from '@/i18n'
+import { GIT_LETTER, GIT_TINT } from '@/lib/git/labels'
+import type { GitChangeKind } from '@/lib/git/types'
 import { dirName } from '@/lib/languages'
 import { getProvider } from '@/lib/provider'
 import { useWorkspace } from '@/store/workspace'
 import type { TreeNode } from '@/lib/tree'
 import { IconChevron, IconFile } from './icons'
 
-function fileTint(name: string): string {
+function fileTint(name: string, change?: GitChangeKind): string {
+  if (change) return GIT_TINT[change]
   if (name.endsWith('.mcfunction')) return 'text-[#dcdcaa]'
   if (name.endsWith('.json') || name.endsWith('.mcmeta')) return 'text-[#cbcb41]'
   if (name.endsWith('.mcdoc')) return 'text-[#4ec9b0]'
@@ -21,6 +25,7 @@ function Row({
   dirty,
   isDir,
   open,
+  change,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -31,6 +36,7 @@ function Row({
   dirty: boolean
   isDir: boolean
   open: boolean
+  change?: GitChangeKind
   onClick: () => void
   onDoubleClick?: () => void
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
@@ -49,14 +55,25 @@ function Row({
       <span className="flex w-3 shrink-0 justify-center text-vsc-fg-dim">
         {isDir ? <IconChevron open={open} /> : null}
       </span>
-      {!isDir && <span className={fileTint(label)}>{<IconFile />}</span>}
+      {!isDir && <span className={fileTint(label, change)}>{<IconFile />}</span>}
       <span className="truncate">{label}</span>
-      {dirty && <span className="ml-auto text-[#c6c6c6]">●</span>}
+      <span className="ml-auto flex shrink-0 items-center gap-1 pl-2">
+        {change && <span className={`text-[11px] ${GIT_TINT[change]}`}>{GIT_LETTER[change]}</span>}
+        {dirty && <span className="text-[#c6c6c6]">●</span>}
+      </span>
     </div>
   )
 }
 
-function NodeView({ node, depth }: { node: TreeNode; depth: number }) {
+function NodeView({
+  node,
+  depth,
+  gitChanges,
+}: {
+  node: TreeNode
+  depth: number
+  gitChanges: Map<string, GitChangeKind>
+}) {
   const expanded = useWorkspace((s) => Boolean(s.expanded[node.path]))
   const activePath = useWorkspace((s) => s.activePath)
   const openFile = useWorkspace((s) => s.openFile)
@@ -113,13 +130,16 @@ function NodeView({ node, depth }: { node: TreeNode; depth: number }) {
         dirty={dirty}
         isDir={isDir}
         open={expanded}
+        change={isDir ? undefined : gitChanges.get(node.path)}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
       />
       {isDir &&
         expanded &&
-        node.children?.map((child) => <NodeView key={child.path} node={child} depth={depth + 1} />)}
+        node.children?.map((child) => (
+          <NodeView key={child.path} node={child} depth={depth + 1} gitChanges={gitChanges} />
+        ))}
     </>
   )
 }
@@ -134,7 +154,14 @@ export function FileExplorer() {
   const openNewFolderDialog = useWorkspace((s) => s.openNewFolderDialog)
   const pasteEntry = useWorkspace((s) => s.pasteEntry)
   const hasClipboard = useWorkspace((s) => Boolean(s.fileClipboard))
+  const gitFiles = useWorkspace((s) => s.gitFiles)
   const tr = useT()
+
+  const gitChanges = useMemo(() => {
+    const map = new Map<string, GitChangeKind>()
+    for (const file of gitFiles) map.set(file.path, file.kind)
+    return map
+  }, [gitFiles])
 
   if (!rootName) {
     return (
@@ -184,7 +211,7 @@ export function FileExplorer() {
         }}
       >
         {tree.map((node) => (
-          <NodeView key={node.path} node={node} depth={0} />
+          <NodeView key={node.path} node={node} depth={0} gitChanges={gitChanges} />
         ))}
       </div>
     </div>

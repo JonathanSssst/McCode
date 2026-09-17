@@ -136,7 +136,10 @@ function addRecent(dir) {
 
 const { validateGitArgs } = require('./gitSafety.cjs')
 
+const INTERACTIVE_GIT = new Set(['fetch', 'pull', 'push'])
+
 function runGit(args, cwd) {
+  const interactive = INTERACTIVE_GIT.has(args[0])
   return new Promise((resolve) => {
     execFile(
       'git',
@@ -145,11 +148,12 @@ function runGit(args, cwd) {
         cwd,
         shell: false,
         windowsHide: true,
-        timeout: 20000,
+        timeout: interactive ? 180_000 : 20_000,
         maxBuffer: 2 * 1024 * 1024,
         env: {
           ...process.env,
-          GIT_TERMINAL_PROMPT: '0',
+          // Network commands may need to open the credential manager UI.
+          GIT_TERMINAL_PROMPT: interactive ? '1' : '0',
           GIT_OPTIONAL_LOCKS: '0',
           GIT_PAGER: 'cat',
           LC_ALL: 'C',

@@ -16,6 +16,8 @@ interface GitResult {
 
 test('main process git IPC runs against a real repository', async () => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'mccode-ipc-'))
+  const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'mccode-ipc-remote-'))
+  execFileSync('git', ['init', '--bare'], { cwd: remote })
   execFileSync('git', ['init'], { cwd: repo })
   execFileSync('git', ['config', 'user.name', 'MCCode'], { cwd: repo })
   execFileSync('git', ['config', 'user.email', 'mccode@example.com'], { cwd: repo })
@@ -28,20 +30,44 @@ test('main process git IPC runs against a real repository', async () => {
   try {
     const page = await app.firstWindow()
     await page.waitForLoadState('domcontentloaded')
-    const result = await page.evaluate(async (dir: string) => {
-      const bridge = (window as unknown as Record<string, unknown>).mccodeDesktop as {
-        openFolderPath(dir: string): Promise<{ path: string } | null>
-        gitCheck(): Promise<{ available: boolean; version: string }>
-        gitRun(args: string[]): Promise<GitResult>
-      }
-      const opened = await bridge.openFolderPath(dir)
-      const check = await bridge.gitCheck()
-      const status = await bridge.gitRun(['status', '--porcelain=v2', '--branch', '-z'])
-      const blockedFlag = await bridge.gitRun(['status', '--upload-pack=calc'])
-      const blockedEscape = await bridge.gitRun(['add', '--', '../outside.txt'])
-      const blockedCommand = await bridge.gitRun(['!sh', '-c', 'echo hi'])
-      return { opened, check, status, blockedFlag, blockedEscape, blockedCommand }
-    }, repo)
+    const result = await page.evaluate(
+      async ({ dir, remoteDir }: { dir: string; remoteDir: string }) => {
+        const bridge = (window as unknown as Record<string, unknown>).mccodeDesktop as {
+          openFolderPath(dir: string): Promise<{ path: string } | null>
+          gitCheck(): Promise<{ available: boolean; version: string }>
+          gitRun(args: string[]): Promise<GitResult>
+        }
+        const opened = await bridge.openFolderPath(dir)
+        const check = await bridge.gitCheck()
+        const status = await bridge.gitRun(['status', '--porcelain=v2', '--branch', '-z'])
+        const blockedFlag = await bridge.gitRun(['status', '--upload-pack=calc'])
+        const blockedEscape = await bridge.gitRun(['add', '--', '../outside.txt'])
+        const blockedCommand = await bridge.gitRun(['!sh', '-c', 'echo hi'])
+
+        const add = await bridge.gitRun(['add', '-A'])
+        const commit = await bridge.gitRun(['commit', '-m', 'initial commit'])
+        const branch = (await bridge.gitRun(['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim()
+        const addRemote = await bridge.gitRun(['remote', 'add', 'origin', remoteDir])
+        const push = await bridge.gitRun(['push', '-u', 'origin', branch])
+        const branchNew = await bridge.gitRun(['switch', '-c', 'feature/ipc'])
+
+        return {
+          opened,
+          check,
+          status,
+          blockedFlag,
+          blockedEscape,
+          blockedCommand,
+          add,
+          commit,
+          branch,
+          addRemote,
+          push,
+          branchNew,
+        }
+      },
+      { dir: repo, remoteDir: remote },
+    )
 
     expect(result.opened?.path).toBe(repo)
     expect(result.check.available).toBe(true)
@@ -55,8 +81,18 @@ test('main process git IPC runs against a real repository', async () => {
     expect(result.blockedEscape.stderr).toContain('outside workspace')
     expect(result.blockedCommand.code).toBe(-1)
     expect(result.blockedCommand.stderr).toContain('subcommand not allowed')
+
+    expect(result.add.code).toBe(0)
+    expect(result.commit.code).toBe(0)
+    expect(result.addRemote.code).toBe(0)
+    expect(result.push.code).toBe(0)
+    expect(result.branchNew.code).toBe(0)
+
+    const remoteRefs = execFileSync('git', ['--git-dir', remote, 'show-ref'], { encoding: 'utf8' })
+    expect(remoteRefs).toContain(`refs/heads/${result.branch}`)
   } finally {
     await app.close()
     fs.rmSync(repo, { recursive: true, force: true })
+    fs.rmSync(remote, { recursive: true, force: true })
   }
 })

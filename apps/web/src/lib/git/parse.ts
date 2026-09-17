@@ -91,3 +91,41 @@ export function parseBranchList(raw: string): string[] {
     .map((line) => line.trim())
     .filter(Boolean)
 }
+
+export interface GitRemote {
+  name: string
+  url: string
+}
+
+export interface GitBranchRef {
+  name: string
+  upstream: string | null
+  current: boolean
+}
+
+export function parseRemotes(raw: string): GitRemote[] {
+  const remotes = new Map<string, string>()
+  for (const line of raw.split('\n')) {
+    const match = /^(\S+)\s+(.+?)\s+\((?:fetch|push)\)$/.exec(line.trim())
+    if (!match) continue
+    if (!remotes.has(match[1])) remotes.set(match[1], match[2])
+  }
+  return [...remotes].map(([name, url]) => ({ name, url }))
+}
+
+export function parseBranchRefs(raw: string): GitBranchRef[] {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      // `for-each-ref --format=%(refname:short) %(upstream:short) %(HEAD)`
+      // Ref names cannot contain spaces, so splitting on whitespace is safe.
+      const parts = line.split(/\s+/)
+      const current = parts[parts.length - 1] === '*'
+      const upstream = parts.length >= 2 && parts[1] !== '*' ? parts[1] : null
+      return { name: parts[0] ?? '', upstream, current }
+    })
+    .filter((branch) => branch.name !== '')
+    .sort((a, b) => (a.current === b.current ? a.name.localeCompare(b.name) : a.current ? -1 : 1))
+}

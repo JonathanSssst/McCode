@@ -1,5 +1,13 @@
 import type { GitRunner } from './client'
-import { emptyStatus, parseBranchList, parseGitLog, parseGitStatus } from './parse'
+import {
+  emptyStatus,
+  parseBranchRefs,
+  parseGitLog,
+  parseGitStatus,
+  parseRemotes,
+  type GitBranchRef,
+  type GitRemote,
+} from './parse'
 import type { GitLogEntry, GitRunResult, GitStatus } from './types'
 
 export interface GitOutcome {
@@ -66,10 +74,48 @@ export async function readLog(runner: GitRunner, limit = 30): Promise<GitLogEntr
   return parseGitLog(result.stdout)
 }
 
-export async function readBranches(runner: GitRunner): Promise<string[]> {
-  const result = await runner.run(['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+export async function readBranches(runner: GitRunner): Promise<GitBranchRef[]> {
+  const result = await runner.run([
+    'for-each-ref',
+    '--format=%(refname:short) %(upstream:short) %(HEAD)',
+    'refs/heads',
+  ])
   if (result.code !== 0) return []
-  return parseBranchList(result.stdout)
+  return parseBranchRefs(result.stdout)
+}
+
+export async function readRemotes(runner: GitRunner): Promise<GitRemote[]> {
+  const result = await runner.run(['remote', '-v'])
+  if (result.code !== 0) return []
+  return parseRemotes(result.stdout)
+}
+
+export async function addRemote(runner: GitRunner, name: string, url: string): Promise<GitOutcome> {
+  return toOutcome(await runner.run(['remote', 'add', name, url]))
+}
+
+export async function fetchAll(runner: GitRunner): Promise<GitOutcome> {
+  return toOutcome(await runner.run(['fetch', '--all', '--prune']))
+}
+
+export async function pull(runner: GitRunner): Promise<GitOutcome> {
+  return toOutcome(await runner.run(['pull', '--ff-only']))
+}
+
+export async function push(runner: GitRunner): Promise<GitOutcome> {
+  return toOutcome(await runner.run(['push']))
+}
+
+export async function pushSetUpstream(
+  runner: GitRunner,
+  remote: string,
+  branch: string,
+): Promise<GitOutcome> {
+  return toOutcome(await runner.run(['push', '-u', remote, branch]))
+}
+
+export async function createBranch(runner: GitRunner, name: string): Promise<GitOutcome> {
+  return toOutcome(await runner.run(['switch', '-c', name]))
 }
 
 export async function switchBranch(runner: GitRunner, name: string): Promise<GitOutcome> {

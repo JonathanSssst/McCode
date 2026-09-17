@@ -41,9 +41,26 @@ describe('validateGitArgs', () => {
 
   it('rejects dangerous flags', () => {
     expect(allows(['fetch', '--upload-pack=calc.exe'])).toBe(false)
-    expect(allows(['status', '-c', 'core.pager=calc'])).toBe(false)
+    expect(allows(['fetch', '--receive-pack=calc.exe'])).toBe(false)
+    expect(allows(['status', '--config-env=core.pager=EVIL'])).toBe(false)
     expect(allows(['status', '--exec-path=/tmp'])).toBe(false)
     expect(allows(['status', '--git-dir=/tmp/x'])).toBe(false)
+    expect(allows(['status', '--work-tree=/tmp'])).toBe(false)
+  })
+
+  it('allows -c and --all/--prune after the subcommand', () => {
+    // `-c` here is a subcommand option (e.g. `switch -c <branch>`); the dangerous
+    // global form `git -c k=v <cmd>` is impossible because the subcommand is first.
+    expect(allows(['switch', '-c', 'feature/foo'])).toBe(true)
+    expect(allows(['fetch', '--all', '--prune'])).toBe(true)
+    expect(allows(['pull', '--ff-only'])).toBe(true)
+    expect(allows(['push', '-u', 'origin', 'main'])).toBe(true)
+  })
+
+  it('allows remote urls', () => {
+    expect(allows(['remote', 'add', 'origin', 'https://github.com/user/repo.git'])).toBe(true)
+    expect(allows(['remote', 'add', 'origin', 'git@github.com:user/repo.git'])).toBe(true)
+    expect(allows(['remote', 'add', 'origin', 'C:\\repos\\bare.git'])).toBe(true)
   })
 
   it('rejects paths that escape the workspace', () => {
