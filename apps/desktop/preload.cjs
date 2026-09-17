@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('mccodeDesktop', {
   copy: (sourcePath, targetPath) => ipcRenderer.invoke('mccode:copy', sourcePath, targetPath),
   stat: (target) => ipcRenderer.invoke('mccode:stat', target),
   reveal: (target) => ipcRenderer.invoke('mccode:reveal', target),
+  pickDirectory: (title) => ipcRenderer.invoke('mccode:pick-directory', title),
   gitCheck: () => ipcRenderer.invoke('mccode:git-check'),
   gitRun: (args) => ipcRenderer.invoke('mccode:git-run', args),
   aiStatus: () => ipcRenderer.invoke('mccode:ai-status'),

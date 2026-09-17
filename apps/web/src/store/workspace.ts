@@ -5,7 +5,13 @@ import { languageForPath, fileName, isBinaryPath } from '@/lib/languages'
 import { detectPackInfo, versionIdForPackFormat, type PackInfo } from '@/lib/pack'
 import { getProvider } from '@/lib/provider'
 import { datapackDirs, datapackFiles } from '@/lib/datapack'
-import { loadSettings, saveSettings, type AppSettings, type EditorSettings } from '@/lib/settings'
+import {
+  loadSettings,
+  saveSettings,
+  type AppSettings,
+  type EditorSettings,
+  type SyncSettings,
+} from '@/lib/settings'
 import type { AiSettings, AiStatus } from '@/lib/ai/types'
 import { clampPanel, clampSidebar, loadLayout, saveLayout } from '@/lib/layout'
 import { pinTab, upsertTab } from '@/lib/tabs'
@@ -25,6 +31,7 @@ import {
   type AiKeyActions,
   type AiKeyState,
 } from './aiKeySlice'
+import { createSyncActions, initialSyncState, type SyncActions, type SyncState } from './syncSlice'
 import { handleDiagnostics, loadSpyglass, startWatching, stopWatching } from './helpers'
 
 let providersRegistered = false
@@ -69,7 +76,8 @@ export interface PromptDialogState {
 
 const emptyPack: PackInfo = { packFormat: null, supportedFormats: null, description: null }
 
-export interface WorkspaceState extends GitState, GitActions, AiKeyState, AiKeyActions {
+export interface WorkspaceState
+  extends GitState, GitActions, AiKeyState, AiKeyActions, SyncState, SyncActions {
   rootName: string | null
   pack: PackInfo
   tree: TreeNode[]
@@ -83,7 +91,7 @@ export interface WorkspaceState extends GitState, GitActions, AiKeyState, AiKeyA
   paletteVisible: boolean
   settingsVisible: boolean
   settings: AppSettings
-  activeView: 'explorer' | 'data' | 'search' | 'outline' | 'scm'
+  activeView: 'explorer' | 'data' | 'search' | 'outline' | 'scm' | 'sync'
   registries: Record<string, string[]>
   gameVersion: string
   resolvedVersion: string | null
@@ -132,7 +140,7 @@ export interface WorkspaceState extends GitState, GitActions, AiKeyState, AiKeyA
   setSidebarWidth: (width: number) => void
   setPanelHeight: (height: number) => void
   persistLayout: () => void
-  setActiveView: (view: 'explorer' | 'data' | 'search' | 'outline' | 'scm') => void
+  setActiveView: (view: 'explorer' | 'data' | 'search' | 'outline' | 'scm' | 'sync') => void
   loadRegistries: (version: string) => Promise<void>
   setGameVersion: (version: string) => Promise<void>
   setPaletteVisible: (value: boolean) => void
@@ -141,6 +149,7 @@ export interface WorkspaceState extends GitState, GitActions, AiKeyState, AiKeyA
   updateSettings: (patch: {
     editor?: Partial<EditorSettings>
     ai?: Partial<AiSettings>
+    sync?: Partial<SyncSettings>
     confirmDelete?: boolean
     autoSave?: AppSettings['autoSave']
     language?: AppSettings['language']
@@ -208,6 +217,7 @@ export const useWorkspace = create<WorkspaceState>()(
     statusMessage: 'Ready',
     ...initialGitState,
     ...initialAiKeyState,
+    ...initialSyncState,
     aiStatus: 'idle',
     aiMessage: '',
     cursor: { line: 1, column: 1, selectionLength: 0 },
@@ -215,6 +225,7 @@ export const useWorkspace = create<WorkspaceState>()(
     ...createFileActions(set, get),
     ...createGitActions(set, get),
     ...createAiKeyActions(set, get),
+    ...createSyncActions(set, get),
 
     openFolder: async (path) => {
       const provider = getProvider()
@@ -587,6 +598,7 @@ export const useWorkspace = create<WorkspaceState>()(
       set((s) => {
         if (patch.editor) s.settings.editor = { ...s.settings.editor, ...patch.editor }
         if (patch.ai) s.settings.ai = { ...s.settings.ai, ...patch.ai }
+        if (patch.sync) s.settings.sync = { ...s.settings.sync, ...patch.sync }
         if (patch.confirmDelete !== undefined) s.settings.confirmDelete = patch.confirmDelete
         if (patch.autoSave !== undefined) s.settings.autoSave = patch.autoSave
         if (patch.language !== undefined) s.settings.language = patch.language

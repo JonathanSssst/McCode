@@ -11,6 +11,7 @@ interface MccodeDesktopBridge {
   copy(sourcePath: string, targetPath: string): Promise<void>
   stat(path: string): Promise<{ isDirectory: boolean; isFile: boolean }>
   reveal(path: string): Promise<void>
+  pickDirectory?(title?: string): Promise<string | null>
   gitCheck(): Promise<{ available: boolean; version: string }>
   gitRun(args: string[]): Promise<{ code: number; stdout: string; stderr: string }>
   aiStatus?(): Promise<{ encryption: boolean; configured: boolean; baseUrl: string; model: string }>

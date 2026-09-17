@@ -152,3 +152,21 @@ export function IconSourceControl({ size = 20 }: { size?: number }) {
     </svg>
   )
 }
+
+export function IconSync({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    >
+      <path d="M4 12a8 8 0 0 1 13.6-5.7L20 8.4" strokeLinecap="round" />
+      <path d="M20 4.2v4.4h-4.4" strokeLinecap="round" />
+      <path d="M20 12a8 8 0 0 1-13.6 5.7L4 15.6" strokeLinecap="round" />
+      <path d="M4 19.8v-4.4h4.4" strokeLinecap="round" />
+    </svg>
+  )
+}

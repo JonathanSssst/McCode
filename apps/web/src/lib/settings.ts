@@ -14,9 +14,16 @@ export interface EditorSettings {
   smoothScrolling: boolean
 }
 
+export interface SyncSettings {
+  /** Absolute path of the target folder (usually a world's `datapacks` directory). */
+  targetDir: string
+  cleanOld: boolean
+}
+
 export interface AppSettings {
   editor: EditorSettings
   ai: AiSettings
+  sync: SyncSettings
   confirmDelete: boolean
   autoSave: 'off' | 'afterDelay'
   language: 'zh' | 'en'
@@ -40,6 +47,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoSave: 'off',
   language: 'zh',
   ai: { ...DEFAULT_AI_SETTINGS },
+  sync: { targetDir: '', cleanOld: true },
 }
 
 const STORAGE_KEY = 'mccode:settings'
@@ -58,6 +66,7 @@ export function loadSettings(): AppSettings {
       ...parsed,
       editor: { ...DEFAULT_SETTINGS.editor, ...(parsed.editor ?? {}) },
       ai: { ...DEFAULT_SETTINGS.ai, ...(parsed.ai ?? {}) },
+      sync: { ...DEFAULT_SETTINGS.sync, ...(parsed.sync ?? {}) },
     }
   } catch {
     return cloneDefaults()

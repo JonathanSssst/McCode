@@ -266,6 +266,18 @@ function registerIpc() {
   ipcMain.handle('mccode:reveal', async (_event, target) => {
     shell.showItemInFolder(target)
   })
+  ipcMain.handle('mccode:pick-directory', async (_event, title) => {
+    const options = {
+      title: typeof title === 'string' && title ? title : undefined,
+      properties: ['openDirectory', 'createDirectory'],
+    }
+    const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const result = window
+      ? await dialog.showOpenDialog(window, options)
+      : await dialog.showOpenDialog(options)
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
   ipcMain.handle('mccode:git-check', async () => {
     const result = await runGit(['--version'], currentRoot ?? app.getPath('home'))
     if (result.code !== 0) return { available: false, version: '' }

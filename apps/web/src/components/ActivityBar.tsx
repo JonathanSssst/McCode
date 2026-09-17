@@ -9,6 +9,7 @@ import {
   IconSearch,
   IconSettings,
   IconSourceControl,
+  IconSync,
 } from './icons'
 
 function ActivityButton({
@@ -52,7 +53,7 @@ export function ActivityBar() {
   const changeCount = useWorkspace((s) => (s.gitRepo ? s.gitFiles.length : 0))
   const tr = useT()
 
-  const clickView = (view: 'explorer' | 'data' | 'search' | 'outline' | 'scm') => {
+  const clickView = (view: 'explorer' | 'data' | 'search' | 'outline' | 'scm' | 'sync') => {
     if (activeView === view && sidebarVisible) toggleSidebar()
     else setActiveView(view)
   }
@@ -94,6 +95,13 @@ export function ActivityBar() {
         onClick={() => clickView('scm')}
       >
         <IconSourceControl />
+      </ActivityButton>
+      <ActivityButton
+        title={tr('activity.sync')}
+        active={activeView === 'sync' && sidebarVisible}
+        onClick={() => clickView('sync')}
+      >
+        <IconSync />
       </ActivityButton>
       <ActivityButton
         title={tr('activity.problems')}

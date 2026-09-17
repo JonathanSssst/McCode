@@ -18,6 +18,7 @@ import { SettingsDialog } from '@/components/SettingsDialog'
 import { SourceControlView } from '@/components/SourceControlView'
 import { Splitter } from '@/components/Splitter'
 import { StatusBar } from '@/components/StatusBar'
+import { SyncView } from '@/components/SyncView'
 import { WindowControls } from '@/components/WindowControls'
 import { DEFAULT_LAYOUT } from '@/lib/layout'
 import { useWorkspace } from '@/store/workspace'
@@ -186,6 +187,8 @@ export default function App() {
                 <OutlineView />
               ) : activeView === 'scm' ? (
                 <SourceControlView />
+              ) : activeView === 'sync' ? (
+                <SyncView />
               ) : (
                 <FileExplorer />
               )}
