@@ -1,15 +1,6 @@
+import { baseName, parentDir } from './paths'
 import type { DirEntry, WorkspaceProvider } from './provider'
 import type { TreeNode } from './tree'
-
-function parentOf(path: string): string {
-  const index = path.lastIndexOf('/')
-  return index === -1 ? '' : path.slice(0, index)
-}
-
-function baseOf(path: string): string {
-  const index = path.lastIndexOf('/')
-  return index === -1 ? path : path.slice(index + 1)
-}
 
 export function createNativeProvider(): WorkspaceProvider {
   const bridge = window.mccodeDesktop
@@ -47,7 +38,7 @@ export function createNativeProvider(): WorkspaceProvider {
       const result = path ? await bridge.openFolderPath(path) : await bridge.openFolder()
       if (!result) return null
       rootPath = result.path
-      return baseOf(result.path) || result.path
+      return baseName(result.path) || result.path
     },
 
     async readTree() {
@@ -71,7 +62,7 @@ export function createNativeProvider(): WorkspaceProvider {
     },
 
     rename(oldRel, newName) {
-      const parent = parentOf(oldRel)
+      const parent = parentDir(oldRel)
       const newRel = parent ? `${parent}/${newName}` : newName
       return bridge.rename(abs(oldRel), abs(newRel))
     },

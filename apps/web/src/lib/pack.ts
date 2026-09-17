@@ -61,11 +61,15 @@ export async function detectPackInfo(
     const parsed = JSON.parse(text) as {
       pack?: {
         pack_format?: number
+        min_format?: number
+        max_format?: number
         supported_formats?: number[] | { min_inclusive?: number; max_inclusive?: number }
         description?: unknown
       }
     }
     const pack = parsed.pack ?? {}
+    const minFormat = typeof pack.min_format === 'number' ? pack.min_format : null
+    const maxFormat = typeof pack.max_format === 'number' ? pack.max_format : null
     let supported: number[] | null = null
     const sf = pack.supported_formats
     if (Array.isArray(sf) && sf.every((n) => typeof n === 'number')) {
@@ -76,10 +80,16 @@ export async function detectPackInfo(
       if (typeof min === 'number' && typeof max === 'number') {
         supported = Array.from({ length: max - min + 1 }, (_, i) => min + i)
       }
+    } else if (minFormat !== null && maxFormat !== null && maxFormat >= minFormat) {
+      supported = Array.from({ length: maxFormat - minFormat + 1 }, (_, i) => minFormat + i)
     }
     const description = typeof pack.description === 'string' ? pack.description : null
+    const packFormat =
+      typeof pack.pack_format === 'number'
+        ? pack.pack_format
+        : (minFormat ?? supported?.[0] ?? null)
     return {
-      packFormat: typeof pack.pack_format === 'number' ? pack.pack_format : null,
+      packFormat,
       supportedFormats: supported,
       description,
     }
@@ -89,5 +99,12 @@ export async function detectPackInfo(
 }
 
 export function makePackMcmeta(packFormat: number, description: string): string {
-  return `${JSON.stringify({ pack: { pack_format: packFormat, description } }, null, 2)}\n`
+  const pack: Record<string, unknown> = { pack_format: packFormat }
+  // 1.21.9+ (pack_format 88) prefers the explicit min/max range.
+  if (packFormat >= 88) {
+    pack.min_format = packFormat
+    pack.max_format = packFormat
+  }
+  pack.description = description
+  return `${JSON.stringify({ pack }, null, 2)}\n`
 }
