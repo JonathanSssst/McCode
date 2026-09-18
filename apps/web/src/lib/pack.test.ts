@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectPackInfo, makePackMcmeta, versionIdForPackFormat } from './pack'
+import { detectPackInfo, makePackMcmeta, parsePackVersion, versionIdForPackFormat } from './pack'
 import type { TreeNode } from './tree'
 
 const tree: TreeNode[] = [{ name: 'pack.mcmeta', path: 'pack.mcmeta', kind: 'file' }]
@@ -39,6 +39,28 @@ describe('detectPackInfo', () => {
   it('returns an empty result without pack.mcmeta or on invalid json', async () => {
     expect((await detectPackInfo([], read('{}'))).packFormat).toBeNull()
     expect((await detectPackInfo(tree, read('not json'))).packFormat).toBeNull()
+  })
+
+  it('parses the datapack version from the description', async () => {
+    const info = await detectPackInfo(
+      tree,
+      read('{"pack":{"min_format":94,"max_format":94,"description":"DTkiller v1.30 - campus"}}'),
+    )
+    expect(info.version).toBe('1.30')
+    expect((await detectPackInfo(tree, read('{"pack":{"pack_format":94}}'))).version).toBeNull()
+  })
+})
+
+describe('parsePackVersion', () => {
+  it('extracts a v-prefixed version', () => {
+    expect(parsePackVersion('DTkiller v1.30 - 校园行政楼')).toBe('1.30')
+    expect(parsePackVersion('pack V1.2.3')).toBe('1.2.3')
+  })
+
+  it('returns null when there is none', () => {
+    expect(parsePackVersion('DTkiller 1.30')).toBeNull()
+    expect(parsePackVersion(null)).toBeNull()
+    expect(parsePackVersion('')).toBeNull()
   })
 })
 

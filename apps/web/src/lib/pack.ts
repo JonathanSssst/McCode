@@ -4,6 +4,16 @@ export interface PackInfo {
   packFormat: number | null
   supportedFormats: number[] | null
   description: string | null
+  /** Datapack version parsed from the description, e.g. `1.30` for `DTkiller v1.30`. */
+  version: string | null
+}
+
+const VERSION_PATTERN = /\bv(\d+(?:\.\d+)*)\b/i
+
+export function parsePackVersion(description: string | null): string | null {
+  if (!description) return null
+  const match = VERSION_PATTERN.exec(description)
+  return match ? match[1] : null
 }
 
 const DATA_PACK_FORMAT_TO_VERSION: Record<number, string> = {
@@ -54,7 +64,7 @@ export async function detectPackInfo(
 ): Promise<PackInfo> {
   const meta = tree.find((node) => node.kind === 'file' && node.name === 'pack.mcmeta')
   if (!meta) {
-    return { packFormat: null, supportedFormats: null, description: null }
+    return { packFormat: null, supportedFormats: null, description: null, version: null }
   }
   try {
     const text = await readText(meta.path)
@@ -84,6 +94,7 @@ export async function detectPackInfo(
       supported = Array.from({ length: maxFormat - minFormat + 1 }, (_, i) => minFormat + i)
     }
     const description = typeof pack.description === 'string' ? pack.description : null
+    const version = parsePackVersion(description)
     const packFormat =
       typeof pack.pack_format === 'number'
         ? pack.pack_format
@@ -92,9 +103,10 @@ export async function detectPackInfo(
       packFormat,
       supportedFormats: supported,
       description,
+      version,
     }
   } catch {
-    return { packFormat: null, supportedFormats: null, description: null }
+    return { packFormat: null, supportedFormats: null, description: null, version: null }
   }
 }
 

@@ -1,24 +1,59 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from './tree'
-import { formatBytes, isOldArtifact, joinPath, stripOldArtifacts, syncZipName } from './sync'
+import {
+  formatBytes,
+  isOldArtifact,
+  joinPath,
+  packArchiveName,
+  stripOldArtifacts,
+  syncZipName,
+} from './sync'
 
 describe('isOldArtifact', () => {
-  it('matches artifacts of the same pack', () => {
+  it('matches current-format artifacts of the same pack', () => {
+    expect(isOldArtifact('DTkiller-mc1.21.11-v1.30.zip', 'DTkiller')).toBe(true)
+    expect(isOldArtifact('DTkiller-mc1.21.11.zip', 'DTkiller')).toBe(true)
+    expect(isOldArtifact('MyPack-mc1.21.11-v2.zip', 'mypack')).toBe(true)
+  })
+
+  it('matches legacy-format artifacts', () => {
     expect(isOldArtifact('mypack-1.21.11-pack94.zip', 'mypack')).toBe(true)
     expect(isOldArtifact('mypack-1.20.6-pack57.zip', 'mypack')).toBe(true)
-    expect(isOldArtifact('MyPack-1.21.11-pack94.ZIP', 'mypack')).toBe(true)
+    expect(isOldArtifact('mypack-1.20.6.zip', 'mypack')).toBe(true)
   })
 
   it('ignores other packs and non-archives', () => {
     expect(isOldArtifact('mypack-extras.zip', 'mypack')).toBe(false)
     expect(isOldArtifact('other-1.21.11-pack94.zip', 'mypack')).toBe(false)
-    expect(isOldArtifact('mypack-1.21.11-pack94', 'mypack')).toBe(false)
+    expect(isOldArtifact('mypack-mc1.21.11-v1.30', 'mypack')).toBe(false)
     expect(isOldArtifact('mypack-1.21.11-pack94.zip', '')).toBe(false)
   })
 
   it('handles pack names with regex characters', () => {
-    expect(isOldArtifact('my.pack-1.21.11-pack94.zip', 'my.pack')).toBe(true)
-    expect(isOldArtifact('myxpack-1.21.11-pack94.zip', 'my.pack')).toBe(false)
+    expect(isOldArtifact('my.pack-mc1.21.11.zip', 'my.pack')).toBe(true)
+    expect(isOldArtifact('myxpack-mc1.21.11.zip', 'my.pack')).toBe(false)
+  })
+})
+
+describe('packArchiveName', () => {
+  it('builds the name, mc version and pack version', () => {
+    expect(packArchiveName({ name: 'DTkiller', mcVersion: '1.21.11', packVersion: '1.30' })).toBe(
+      'DTkiller-mc1.21.11-v1.30.zip',
+    )
+  })
+
+  it('drops missing segments', () => {
+    expect(packArchiveName({ name: 'DTkiller', mcVersion: '1.21.11' })).toBe(
+      'DTkiller-mc1.21.11.zip',
+    )
+    expect(packArchiveName({ name: 'DTkiller', packVersion: 'v1.30' })).toBe('DTkiller-v1.30.zip')
+    expect(packArchiveName({ name: 'DTkiller' })).toBe('DTkiller.zip')
+  })
+
+  it('normalises mc/v prefixes and sanitises the result', () => {
+    expect(packArchiveName({ name: 'a/b', mcVersion: 'mc1.21', packVersion: 'v1.0' })).toBe(
+      'a-b-mc1.21-v1.0.zip',
+    )
   })
 })
 

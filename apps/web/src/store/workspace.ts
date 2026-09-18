@@ -74,7 +74,12 @@ export interface PromptDialogState {
   onConfirm: (value: string) => void
 }
 
-const emptyPack: PackInfo = { packFormat: null, supportedFormats: null, description: null }
+const emptyPack: PackInfo = {
+  packFormat: null,
+  supportedFormats: null,
+  description: null,
+  version: null,
+}
 
 export interface WorkspaceState
   extends GitState, GitActions, AiKeyState, AiKeyActions, SyncState, SyncActions {

@@ -1,7 +1,13 @@
 import { t } from '@/i18n'
 import { versionIdForPackFormat } from '@/lib/pack'
 import { getProvider } from '@/lib/provider'
-import { formatBytes, isOldArtifact, joinPath, stripOldArtifacts, syncZipName } from '@/lib/sync'
+import {
+  formatBytes,
+  isOldArtifact,
+  joinPath,
+  packArchiveName,
+  stripOldArtifacts,
+} from '@/lib/sync'
 import { buildWorkspaceZip } from '@/lib/zip'
 import type { WorkspaceState } from './workspace'
 
@@ -79,11 +85,11 @@ export function createSyncActions(set: ImmerSet, get: ImmerGet): SyncActions {
       })
       try {
         const mcVersion = resolvedVersion ?? versionIdForPackFormat(pack.packFormat)
-        const fileName = syncZipName([
-          rootName,
+        const fileName = packArchiveName({
+          name: rootName,
           mcVersion,
-          pack.packFormat !== null ? `pack${pack.packFormat}` : null,
-        ])
+          packVersion: pack.version,
+        })
         const data = await buildWorkspaceZip(stripOldArtifacts(tree, rootName), (path) =>
           getProvider().readFile(path),
         )

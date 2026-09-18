@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const FILES: Record<string, string> = {
-  'pack.mcmeta': '{"pack":{"pack_format":94,"description":"sync e2e"}}',
+  'pack.mcmeta': '{"pack":{"pack_format":94,"description":"sync e2e v1.30"}}',
   'data/mypack/function/main.mcfunction': 'say hello\n',
 }
 
@@ -105,11 +105,10 @@ test('sync packages the datapack and prunes older artifacts', async ({ page }) =
   const result = await calls()
   const written = result.written[0]
   expect(written.path.startsWith(`${TARGET_DIR}/`)).toBe(true)
-  expect(written.path.endsWith('.zip')).toBe(true)
-  expect(written.path).toContain('mempack-')
+  expect(written.path).toMatch(/\/mempack-mc[^/]*-v1\.30\.zip$/)
   expect(written.size).toBeGreaterThan(0)
 
-  // The previously produced archive is replaced, older ones are pruned.
+  // Legacy and current archives of the same pack are pruned.
   expect(result.removed).toContain(`${TARGET_DIR}/mempack-1.20.6-pack57.zip`)
   expect(result.removed).not.toContain(`${TARGET_DIR}/notes.txt`)
   expect(result.removed).not.toContain(`${TARGET_DIR}/other-pack`)

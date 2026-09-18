@@ -51,6 +51,7 @@ export function SyncView() {
           </div>
           <InfoRow label={tr('sync.name')} value={rootName} />
           <InfoRow label={tr('sync.version')} value={version ?? tr('sync.unknown')} />
+          <InfoRow label={tr('sync.packVersion')} value={pack.version ?? tr('sync.unknown')} />
           <InfoRow
             label={tr('sync.format')}
             value={pack.packFormat === null ? tr('sync.unknown') : String(pack.packFormat)}

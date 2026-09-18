@@ -3,7 +3,8 @@ import { versionIdForPackFormat } from '@/lib/pack'
 import { getProvider } from '@/lib/provider'
 import { TEMPLATES, detectNamespace } from '@/lib/templates'
 import { findNode, flattenFiles } from '@/lib/tree'
-import { buildWorkspaceZip, buildZipName, downloadZip } from '@/lib/zip'
+import { buildWorkspaceZip, downloadZip } from '@/lib/zip'
+import { packArchiveName } from '@/lib/sync'
 import { uniqueChildName } from './helpers'
 import type { WorkspaceState } from './workspace'
 
@@ -253,11 +254,7 @@ export const createFileActions = (set: ImmerSet, get: ImmerGet): FileActions => 
     })
     try {
       const mcVersion = resolvedVersion ?? versionIdForPackFormat(pack.packFormat)
-      const name = buildZipName([
-        rootName,
-        mcVersion,
-        pack.packFormat !== null ? `pack${pack.packFormat}` : null,
-      ])
+      const name = packArchiveName({ name: rootName ?? '', mcVersion, packVersion: pack.version })
       const data = await buildWorkspaceZip(tree, (path) => getProvider().readFile(path))
       downloadZip(name, data)
       set((s) => {

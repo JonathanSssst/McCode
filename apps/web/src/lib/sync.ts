@@ -5,13 +5,37 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** Matches zip artifacts previously produced for the same pack, e.g. `mypack-1.21.11-pack94.zip`. */
+/**
+ * Matches zip artifacts previously produced for the same pack, in the current
+ * `<name>-mc<version>[-v<version>].zip` format and the legacy
+ * `<name>-<version>[-pack<format>].zip` format.
+ */
 export function isOldArtifact(fileName: string, packName: string): boolean {
   const name = fileName.trim()
   const pack = packName.trim()
   if (!pack || !/\.zip$/i.test(name)) return false
-  const pattern = new RegExp(`^${escapeRegExp(pack)}-\\d+(?:\\.\\d+)*-pack\\d+\\.zip$`, 'i')
+  const pattern = new RegExp(
+    `^${escapeRegExp(pack)}-(?:mc)?\\d+(?:\\.\\d+)*(?:-(?:pack\\d+|v[\\w.-]+))?\\.zip$`,
+    'i',
+  )
   return pattern.test(name)
+}
+
+export interface ArchiveNameParts {
+  name: string
+  mcVersion?: string | null
+  packVersion?: string | null
+}
+
+/** Builds `<name>-mc<mcVersion>-v<packVersion>.zip`, dropping missing segments. */
+export function packArchiveName(parts: ArchiveNameParts): string {
+  const mcVersion = parts.mcVersion?.trim().replace(/^mc/i, '')
+  const packVersion = parts.packVersion?.trim().replace(/^v/i, '')
+  return buildZipName([
+    parts.name,
+    mcVersion ? `mc${mcVersion}` : null,
+    packVersion ? `v${packVersion}` : null,
+  ])
 }
 
 export function syncZipName(parts: Array<string | number | null | undefined>): string {
